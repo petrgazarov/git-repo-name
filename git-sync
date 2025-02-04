@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Use git-sh-setup for Git script utilities
+# https://www.kernel.org/pub/software/scm/git/docs/git-sh-setup.html
+
+# shellcheck disable=SC2034
+OPTIONS_STUCKLONG=t
+# shellcheck disable=SC2034
+OPTIONS_KEEPDASHDASH=
+# shellcheck disable=SC2034
+OPTIONS_SPEC="\
+git sync [options]
+--
+  Syncs repository name and remote URL between remote and local.
+  https://github.com/petrgazarov/git-sync
+
+  Available options are
+s,source=     specify whether remote or local should be used as the source (default: remote, values: remote, local)
+n,dry-run!    print the commands that would be executed without actually executing them
+"
+# shellcheck source=/dev/null
+SUBDIRECTORY_OK='Yes' . "$(git --exec-path)/git-sh-setup"
+
+# Defaults
+source="remote"
+
+
+function parse_options() {
+  eval "$(git rev-parse --parseopt -- "$@" <<!
+$OPTIONS_SPEC
+!
+)"
+
+  while [ $# -gt 0 ]; do
+    opt="$1"
+    shift
+    case "$opt" in
+      -s|--source) source="$1"; shift ;;
+      --) break ;;
+    esac
+  done
+}
+
+function validate() {
+  # Validate options
+  if [[ "$source" != "remote" && "$source" != "local" ]]; then
+    echo >&2 "invalid value for --source: '$source'. Valid values are 'remote' or 'local'."
+    exit 2
+  fi
+}
+
+function get_remote_name() {
+  local url="$1"
+  
+  # Remove .git suffix if present
+  url="${url%.git}"
+  
+  # Handle SSH format (git@github.com:user/repo)
+  if [[ "$url" =~ ^git@ ]]; then
+    url="${url#*:}"  # Remove everything up to and including the colon
+  fi
+  
+  # Handle HTTPS format (https://github.com/user/repo)
+  url="${url##*/}"  # Get last part of path
+  
+  echo "$url"
+}
+
+function get_local_name() {
+  basename "$(git rev-parse --show-toplevel)"
+}
+
+function sync() {
+  local remote_url
+  remote_url=$(git remote get-url origin)
+
+  local remote_name
+  remote_name=$(get_remote_name "$remote_url")
+  local local_name
+  local_name=$(get_local_name)
+
+  if [[ "$remote_name" == "$local_name" ]]; then
+    echo "Repository names already match: $local_name"
+  else
+    local parent_dir
+    parent_dir="$(dirname "$(git rev-parse --show-toplevel)")"
+    echo "Renaming directory from '$local_name' to '$remote_name'"
+    mv "$parent_dir/$local_name" "$parent_dir/$remote_name"
+  fi
+}
+
+function main() {
+  parse_options "$@" && validate && sync
+}
+
+# Execute main function
+main "$@"
