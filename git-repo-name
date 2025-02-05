@@ -201,12 +201,91 @@ function config_get_github_token() {
   return 1
 }
 
+function is_github_url() {
+  local url="$1"
+  [[ $url =~ ^(https://github\.com/|git@github\.com:|git://github\.com/) ]]
+}
+
+function get_github_repo_info() {
+  local owner="$1"
+  local repo="$2"
+  local token
+  token=$(config_get_github_token) || return 1
+
+  local api_response
+  api_response=$(curl -s -H "Authorization: token $token" \
+    "https://api.github.com/repos/$owner/$repo")
+
+  # Check if response contains error
+  if [[ "$api_response" =~ "\"message\":\"Not Found\"" ]]; then
+    echo "Repository not found: $owner/$repo" >&2
+    return 1
+  fi
+
+  echo "$api_response"
+}
+
+function extract_github_parts() {
+  local url="$1"
+  local owner_repo
+
+  # Handle different URL formats
+  case "$url" in
+    "git@github.com:"*)
+      owner_repo="${url#git@github.com:}"
+      ;;
+    "git://github.com/"*)
+      owner_repo="${url#git://github.com/}"
+      ;;
+    "https://github.com/"*)
+      owner_repo="${url#https://github.com/}"
+      ;;
+    *)
+      echo "Unsupported GitHub URL format: $url" >&2
+      return 1
+      ;;
+  esac
+
+  # Remove .git suffix if present
+  owner_repo="${owner_repo%.git}"
+  
+  # Split into owner and repo
+  local owner="${owner_repo%%/*}"
+  local repo="${owner_repo#*/}"
+  
+  echo "$owner $repo"
+}
+
 function sync() {
   local remote_url
   remote_url=$(git remote get-url origin)
 
-  local remote_name
-  remote_name=$(get_remote_name "$remote_url")
+  if is_github_url "$remote_url"; then
+    # Get current owner and repo from URL
+    read -r owner repo <<< "$(extract_github_parts "$remote_url")"
+    
+    # Get latest repo info from GitHub
+    local repo_info
+    repo_info=$(get_github_repo_info "$owner" "$repo")
+    
+    # Extract new clone URL using sed
+    local new_url
+    new_url=$(echo "$repo_info" | sed -n 's/.*"clone_url": *"\([^"]*\)".*/\1/p')
+    
+    # Extract remote name using awk
+    local remote_name
+    remote_name=$(echo "$repo_info" | awk -F'"' '/"name"/{print $4}')
+    
+    # Update remote URL if changed
+    if [ "$new_url" != "$remote_url" ]; then
+      echo "Updating remote URL to: $new_url"
+      git remote set-url origin "$new_url"
+    fi
+  else
+    local remote_name
+    remote_name=$(get_remote_name "$remote_url")
+  fi
+
   local local_name
   local_name=$(basename "$(git rev-parse --show-toplevel)")
 

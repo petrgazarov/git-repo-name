@@ -49,4 +49,4 @@ teardown() {
     
     [ "$status" -eq 2 ]
     [[ "$output" =~ error:\ No\ such\ remote\ \'origin\' ]]
-} 
+}
