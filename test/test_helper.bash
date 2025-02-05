@@ -1,10 +1,10 @@
 set -e
 
 setup_helper() {
-    # Get path to local git-sync script
-    GIT_SYNC_PATH="$PWD/git-sync"
-    export GIT_SYNC_PATH
-    chmod +x "$GIT_SYNC_PATH"
+    # Get path to local git-repo-name script
+    GIT_REPO_NAME_PATH="$PWD/git-repo-name"
+    export GIT_REPO_NAME_PATH
+    chmod +x "$GIT_REPO_NAME_PATH"
 
     # Create a temporary directory for test repositories
     TEST_DIR="$(mktemp -d)"
@@ -15,11 +15,7 @@ setup_helper() {
     export ORIG_DIR
 }
 
-setup() {
-    setup_helper
-}
-
-teardown() {
+teardown_helper() {
     # Return to original directory
     cd "${ORIG_DIR}"
     
