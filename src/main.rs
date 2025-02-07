@@ -27,7 +27,7 @@ enum Commands {
         #[arg(long)]
         remote: Option<String>,
 
-        /// Print commands without executing them
+        /// Print actions without executing them
         #[arg(short = 'n', long)]
         dry_run: bool,
     },

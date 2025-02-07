@@ -67,33 +67,31 @@ pub fn sync(source: Source, dry_run: bool) -> Result<()> {
             if github::is_github_url(&remote_url) {
                 github::sync_github_repo(&repo, &remote_url, dry_run)
             } else {
-                sync_filesystem_repo(&repo, &remote_url, dry_run)
+                let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
+                let new_name = git::extract_repo_name_from_path(&canonical_path)?;
+
+                let repo_path = repo
+                    .workdir()
+                    .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?;
+
+                if remote_url == canonical_path {
+                    println!("Repository is already named correctly");
+                    return Ok(());
+                }
+
+                if dry_run {
+                    println!("Would rename repository to '{}'", new_name);
+                    return Ok(());
+                }
+
+                fs::rename_directory(repo_path, &new_name, dry_run)
             }
         }
         Source::Local => {
-            println!("Using local directory name as source");
+            println!("TODO: Implement local source sync");
             Ok(())
         }
     }
-}
-
-pub fn sync_filesystem_repo(
-    repo: &git2::Repository,
-    remote_url: &str,
-    dry_run: bool,
-) -> Result<()> {
-    let new_name = git::extract_repo_name(&remote_url)?;
-
-    if dry_run {
-        println!("Would rename repository to: {}", new_name);
-        return Ok(());
-    }
-
-    let repo_path = repo
-        .workdir()
-        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?;
-
-    fs::rename_directory(repo_path, &new_name)
 }
 
 pub fn fetch_repo_name() -> Result<String> {
@@ -107,9 +105,8 @@ pub fn fetch_repo_name() -> Result<String> {
         Ok(format!("{} ({})", repo_info.name, repo_info.clone_url))
     } else {
         let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
-        let path_str = canonical_path.to_string_lossy();
-        let name = git::extract_repo_name(&canonical_path.to_string_lossy())?;
-        Ok(format!("{} ({})", name, path_str))
+        let name = git::extract_repo_name_from_path(&canonical_path)?;
+        Ok(format!("{} ({})", name, canonical_path))
     }
 }
 

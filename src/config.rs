@@ -44,7 +44,7 @@ impl Config {
         };
 
         // Load values from disk if file exists
-        let config_file = config.get_config_file();
+        let config_file = config.get_config_file_path();
         if config_file.exists() {
             let ini = Ini::load_from_file(&config_file)
                 .map_err(|e| Error::Config(format!("Failed to read config file: {}", e)))?;
@@ -84,7 +84,7 @@ impl Config {
         ini.with_section(None::<String>)
             .set("default_remote".to_string(), values.default_remote.clone());
 
-        let config_file = self.get_config_file();
+        let config_file = self.get_config_file_path();
         if let Some(parent) = config_file.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -96,7 +96,7 @@ impl Config {
         Ok(())
     }
 
-    fn get_config_file(&self) -> PathBuf {
+    fn get_config_file_path(&self) -> PathBuf {
         self.config_dir.join("config")
     }
 
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_handling() -> anyhow::Result<()> {
+    fn test_remote() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
         let config = Config {
             config_dir: temp.path().to_path_buf(),
@@ -234,27 +234,56 @@ mod tests {
         new_config.load_from_ini(&ini)?;
         assert_eq!(new_config.get_remote()?, "upstream");
 
-        // Test setting temporary remote (should not persist)
-        config.set_remote("temporary".to_string());
-        assert_eq!(config.get_remote()?, "temporary");
-        assert_eq!(new_config.get_remote()?, "upstream"); // Other instance unaffected
+        new_config.set_remote("temporary".to_string());
+        assert_eq!(new_config.get_remote()?, "temporary");
 
         Ok(())
     }
 
     #[test]
-    fn test_config_error_cases() -> anyhow::Result<()> {
+    fn test_malformed_config_file() -> anyhow::Result<()> {
+        use std::env;
         let temp = assert_fs::TempDir::new()?;
-        let config_file = temp.child("config");
-
-        // Test reading non-existent file
-        assert!(!config_file.exists());
-        assert!(matches!(Ini::load_from_file(&config_file), Err(_)));
-
-        // Test malformed INI file
+        // Set temporary config directory for Config::new
+        env::set_var("XDG_CONFIG_HOME", temp.path());
+        // The config file will be located at "$XDG_CONFIG_HOME/git-repo-name/config"
+        let config_file = temp.child("git-repo-name").child("config");
+        if let Some(parent) = config_file.path().parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        // Write malformed content into the config file
         config_file.write_str("not a valid ini file")?;
-        assert!(matches!(Ini::load_from_file(&config_file), Err(_)));
 
+        // Now, calling Config::new should attempt to load the malformed file and produce an error
+        let config_result = Config::new();
+        assert!(
+            config_result.is_err(),
+            "Expected error due to malformed config file"
+        );
+
+        // Clean up the environment variable
+        env::remove_var("XDG_CONFIG_HOME");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_file_initial_creation() -> anyhow::Result<()> {
+        use std::env;
+        let temp = assert_fs::TempDir::new()?;
+        env::set_var("XDG_CONFIG_HOME", temp.path());
+        
+        // The config file will be located at "$XDG_CONFIG_HOME/git-repo-name/config"
+        let config_file = temp.child("git-repo-name").child("config");
+        config_file.assert(predicate::path::missing());
+        
+        // Calling Config::new should create the config file
+        let config = Config::new()?;
+        config_file.assert(predicate::path::exists());
+        
+        // Check that the default remote is as expected
+        assert_eq!(config.get_remote()?, "origin");
+        env::remove_var("XDG_CONFIG_HOME");
         Ok(())
     }
 

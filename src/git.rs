@@ -16,24 +16,7 @@ pub fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String> {
         .ok_or_else(|| Error::NoRemote(remote_name.to_string()))?
         .to_string();
 
-    // If it's a filesystem path, canonicalize it
-    if url.starts_with('/')
-        || url.starts_with("file://")
-        || url.starts_with("./")
-        || url.starts_with("../")
-    {
-        let path = if url.starts_with("file://") {
-            Path::new(&url[7..])
-        } else {
-            Path::new(&url)
-        };
-
-        let canonical = path.canonicalize().map_err(|e| Error::Other(e.into()))?;
-
-        Ok(format!("file://{}", canonical.display()))
-    } else {
-        Ok(url)
-    }
+    Ok(url)
 }
 
 pub fn set_remote_url(repo: &Repository, remote_name: &str, url: &str) -> Result<()> {
@@ -41,7 +24,7 @@ pub fn set_remote_url(repo: &Repository, remote_name: &str, url: &str) -> Result
         .map_err(|e| Error::Other(e.into()))
 }
 
-pub fn extract_repo_name(url: &str) -> Result<String> {
+pub fn extract_repo_name_from_path(url: &str) -> Result<String> {
     // Remove .git suffix if present
     let url = url.strip_suffix(".git").unwrap_or(url);
 
@@ -64,7 +47,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_extract_repo_name() {
+    fn test_extract_repo_name_from_path() {
         let test_cases = vec![
             ("/path/to/repo.git", "repo"),
             ("/path/to/repo", "repo"),
@@ -76,7 +59,7 @@ mod tests {
         ];
 
         for (url, expected) in test_cases {
-            assert_eq!(extract_repo_name(url).unwrap(), expected);
+            assert_eq!(extract_repo_name_from_path(url).unwrap(), expected);
         }
     }
 

@@ -1,11 +1,11 @@
 use crate::{Error, Result};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Resolves a path to its canonical form, following symlinks.
 /// If the path is a file:// URL, extracts and resolves the path portion.
-pub fn resolve_canonical_path(path: &Path) -> Result<PathBuf> {
+pub fn resolve_canonical_path(path: &Path) -> Result<String> {
     let path_str = path.to_string_lossy();
     let path_to_resolve = if path_str.starts_with("file://") {
         Path::new(&path_str[7..])
@@ -17,26 +17,31 @@ pub fn resolve_canonical_path(path: &Path) -> Result<PathBuf> {
         .canonicalize()
         .map_err(|e| Error::Fs(format!("Failed to resolve path: {}", e)))?;
 
-    Ok(PathBuf::from(format!("file://{}", canonical.display())))
+    Ok(format!("file://{}", canonical.display()))
 }
 
 /// Renames a directory to a new name, keeping it in the same parent directory.
 /// Returns an error if the directory cannot be renamed or if the paths are invalid.
-pub fn rename_directory(from_path: &Path, new_name: &str) -> Result<()> {
-    let current_name = from_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| Error::Fs("Invalid directory name".into()))?;
-
-    if current_name == new_name {
-        println!("Directory names already match: {}", new_name);
-        return Ok(());
-    }
-
-    let parent_path = from_path
+pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> Result<()> {
+    let parent_path = current_path
         .parent()
         .ok_or_else(|| Error::Fs("Cannot get parent directory".into()))?;
     let new_path = parent_path.join(new_name);
+
+    if dry_run {
+        println!(
+            "Would rename directory '{}' to '{}'",
+            current_path.display(),
+            new_path.display()
+        );
+        return Ok(());
+    }
+
+    println!(
+        "Renaming directory '{}' to '{}'...",
+        current_path.display(),
+        new_path.display()
+    );
 
     if new_path.exists() {
         return Err(Error::Fs(format!(
@@ -45,11 +50,7 @@ pub fn rename_directory(from_path: &Path, new_name: &str) -> Result<()> {
         )));
     }
 
-    println!(
-        "Renaming directory from '{}' to '{}'",
-        current_name, new_name
-    );
-    std::fs::rename(from_path, new_path)
+    std::fs::rename(current_path, new_path)
         .map_err(|e| Error::Fs(format!("Failed to rename directory: {}", e)))?;
 
     Ok(())
@@ -81,12 +82,12 @@ mod tests {
         // Test regular path
         let resolved = resolve_canonical_path(real_dir.path())?;
         let expected = format!("file://{}", real_dir.path().canonicalize()?.display());
-        assert_eq!(resolved.to_string_lossy(), expected);
+        assert_eq!(resolved, expected);
 
         // Test file:// URL
         let file_url = format!("file://{}", real_dir.path().display());
         let resolved_url = resolve_canonical_path(Path::new(&file_url))?;
-        assert_eq!(resolved_url.to_string_lossy(), expected);
+        assert_eq!(resolved_url, expected);
 
         #[cfg(unix)]
         {
@@ -94,7 +95,7 @@ mod tests {
             symlink(real_dir.path(), symlink_path.path())?;
 
             let resolved = resolve_canonical_path(symlink_path.path())?;
-            assert_eq!(resolved.to_string_lossy(), expected);
+            assert_eq!(resolved, expected);
         }
 
         Ok(())
@@ -106,7 +107,7 @@ mod tests {
         let old_dir = temp.child("old_name");
         old_dir.create_dir_all()?;
 
-        rename_directory(old_dir.path(), "new_name")?;
+        rename_directory(old_dir.path(), "new_name", false)?;
 
         assert!(!old_dir.exists());
         let new_dir = temp.child("new_name");
@@ -121,7 +122,7 @@ mod tests {
         let dir = temp.child("same_name");
         dir.create_dir_all()?;
 
-        rename_directory(dir.path(), "same_name")?;
+        rename_directory(dir.path(), "same_name", false)?;
         assert!(dir.exists());
 
         Ok(())
@@ -134,7 +135,7 @@ mod tests {
         // Test invalid source path
         let non_existent = temp.child("non_existent");
         assert!(matches!(
-            rename_directory(non_existent.path(), "new_name"),
+            rename_directory(non_existent.path(), "new_name", false),
             Err(Error::Fs(_))
         ));
 
@@ -145,7 +146,7 @@ mod tests {
         source.create_dir_all().unwrap();
 
         assert!(matches!(
-            rename_directory(source.path(), "existing"),
+            rename_directory(source.path(), "existing", false),
             Err(Error::Fs(_))
         ));
     }

@@ -73,26 +73,44 @@ pub fn parse_github_url(url: &str) -> Result<(String, String)> {
     Ok((owner, repo))
 }
 
+fn format_new_remote(original_remote: &str, owner: &str, repo: &str) -> String {
+    if original_remote.starts_with("git@") {
+        // SSH shorthand (e.g. git@github.com:owner/repo.git)
+        format!("git@github.com:{}/{}.git", owner, repo)
+    } else if original_remote.starts_with("ssh://") {
+        // Full SSH URL (e.g. ssh://git@github.com/owner/repo.git)
+        format!("ssh://git@github.com/{}/{}.git", owner, repo)
+    } else if original_remote.starts_with("git://") {
+        // Git protocol (e.g. git://github.com/owner/repo.git)
+        format!("git://github.com/{}/{}.git", owner, repo)
+    } else {
+        // Otherwise default to HTTPS.
+        format!("https://github.com/{}/{}.git", owner, repo)
+    }
+}
+
 pub fn sync_github_repo(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
     let (owner, repo_name) = parse_github_url(remote_url)?;
     let repo_info = get_repo_info(&owner, &repo_name)?;
     let new_name = repo_info.name;
 
-    if dry_run {
-        println!("Would rename repository to: {}", new_name);
-        return Ok(());
-    }
-
-    if repo_info.clone_url != remote_url {
-        let remote = CONFIG.get_remote()?;
-        println!("Updating remote URL to: {}", repo_info.clone_url);
-        crate::git::set_remote_url(repo, &remote, &repo_info.clone_url)?;
-    }
-
     let repo_path = repo
         .workdir()
         .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?;
-    crate::fs::rename_directory(repo_path, &new_name)
+
+    if repo_name == new_name {
+        println!("Repository is already named correctly");
+        return Ok(());
+    }
+
+    let upstream_remote_url = format_new_remote(remote_url, &owner, &repo_name);
+    if upstream_remote_url != remote_url {
+        let remote = CONFIG.get_remote()?;
+        println!("Updating remote URL to: {}", upstream_remote_url);
+        crate::git::set_remote_url(repo, &remote, &upstream_remote_url)?;
+    }
+
+    crate::fs::rename_directory(repo_path, &new_name, dry_run)
 }
 
 #[cfg(test)]
