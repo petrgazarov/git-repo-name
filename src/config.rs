@@ -85,6 +85,10 @@ impl Config {
             .set("default_remote".to_string(), values.default_remote.clone());
 
         let config_file = self.get_config_file();
+        if let Some(parent) = config_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
         ini.write_to_file(&config_file)
             .map_err(|e| Error::Config(format!("Failed to write config file: {}", e)))?;
 
@@ -250,6 +254,32 @@ mod tests {
         // Test malformed INI file
         config_file.write_str("not a valid ini file")?;
         assert!(matches!(Ini::load_from_file(&config_file), Err(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_creates_parent_directories() -> anyhow::Result<()> {
+        let temp = assert_fs::TempDir::new()?;
+        let nested_config_dir = temp.path().join("deeply/nested/config/dir");
+        let config = Config {
+            config_dir: nested_config_dir,
+            config_values: RwLock::new(ConfigValues {
+                github_token: None,
+                default_remote: "origin".to_string(),
+                remote: None,
+            }),
+        };
+
+        // Write config to a deeply nested directory that doesn't exist yet
+        config.write_to_disk()?;
+
+        // Verify the config file and its parent directories were created
+        let config_file = temp.path().join("deeply/nested/config/dir/config");
+        assert!(config_file.exists());
+        assert!(config_file.is_file());
+        assert!(config_file.parent().unwrap().exists());
+        assert!(config_file.parent().unwrap().is_dir());
 
         Ok(())
     }

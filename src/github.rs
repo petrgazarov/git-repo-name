@@ -14,7 +14,9 @@ pub struct GitHubRepo {
 
 pub fn get_repo_info(owner: &str, repo: &str) -> Result<GitHubRepo> {
     let client = create_client()?;
-    let url = format!("https://api.github.com/repos/{}/{}", owner, repo);
+    let base_url = std::env::var("GITHUB_API_BASE_URL")
+        .unwrap_or_else(|_| "https://api.github.com".to_string());
+    let url = format!("{}/repos/{}/{}", base_url, owner, repo);
 
     client
         .get(&url)
@@ -45,12 +47,12 @@ fn create_client() -> Result<ReqwestClient> {
 }
 
 pub fn is_github_url(url: &str) -> bool {
-    let re = Regex::new(r"^(https://github\.com/|git@github\.com:|git://github\.com/)").unwrap();
+    let re = Regex::new(r"^(?:https://(?:www\.)?github\.com/|git@github\.com:|ssh://git@github\.com/|git://github\.com/)[^/]+/[^/\s]+(?:\.git)?$").unwrap();
     re.is_match(url)
 }
 
 pub fn parse_github_url(url: &str) -> Result<(String, String)> {
-    let re = Regex::new(r"^(?:https://github\.com/|git@github\.com:|git://github\.com/)([^/]+)/([^/\.]+)(?:\.git)?$").unwrap();
+    let re = Regex::new(r"^(?:https://(?:www\.)?github\.com/|git@github\.com:|ssh://git@github\.com/|git://github\.com/)([^/]+)/([^/\.]+?)(?:\.git)?$").unwrap();
 
     let caps = re
         .captures(url)
@@ -100,10 +102,19 @@ mod tests {
     #[test]
     fn test_parse_github_url() {
         let test_cases = vec![
+            // HTTPS URLs
             ("https://github.com/owner/repo.git", ("owner", "repo")),
-            ("git@github.com:owner/repo.git", ("owner", "repo")),
-            ("git://github.com/owner/repo.git", ("owner", "repo")),
             ("https://github.com/owner/repo", ("owner", "repo")),
+            ("https://www.github.com/owner/repo.git", ("owner", "repo")),
+            ("https://www.github.com/owner/repo", ("owner", "repo")),
+            // SSH URLs
+            ("git@github.com:owner/repo.git", ("owner", "repo")),
+            ("git@github.com:owner/repo", ("owner", "repo")),
+            ("ssh://git@github.com/owner/repo.git", ("owner", "repo")),
+            ("ssh://git@github.com/owner/repo", ("owner", "repo")),
+            // Git protocol URLs
+            ("git://github.com/owner/repo.git", ("owner", "repo")),
+            ("git://github.com/owner/repo", ("owner", "repo")),
         ];
 
         for (url, (expected_owner, expected_repo)) in test_cases {
@@ -115,9 +126,22 @@ mod tests {
 
     #[test]
     fn test_is_github_url() {
+        // Valid URLs
         assert!(is_github_url("https://github.com/owner/repo.git"));
+        assert!(is_github_url("https://github.com/owner/repo"));
+        assert!(is_github_url("https://www.github.com/owner/repo.git"));
+        assert!(is_github_url("https://www.github.com/owner/repo"));
         assert!(is_github_url("git@github.com:owner/repo.git"));
+        assert!(is_github_url("git@github.com:owner/repo"));
+        assert!(is_github_url("ssh://git@github.com/owner/repo.git"));
+        assert!(is_github_url("ssh://git@github.com/owner/repo"));
         assert!(is_github_url("git://github.com/owner/repo.git"));
+        assert!(is_github_url("git://github.com/owner/repo"));
+
+        // Invalid URLs
         assert!(!is_github_url("https://gitlab.com/owner/repo.git"));
+        assert!(!is_github_url("git@gitlab.com:owner/repo.git"));
+        assert!(!is_github_url("https://github.com"));
+        assert!(!is_github_url("git@github.com:"));
     }
 }

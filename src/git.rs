@@ -16,7 +16,24 @@ pub fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String> {
         .ok_or_else(|| Error::NoRemote(remote_name.to_string()))?
         .to_string();
 
-    Ok(url)
+    // If it's a filesystem path, canonicalize it
+    if url.starts_with('/')
+        || url.starts_with("file://")
+        || url.starts_with("./")
+        || url.starts_with("../")
+    {
+        let path = if url.starts_with("file://") {
+            Path::new(&url[7..])
+        } else {
+            Path::new(&url)
+        };
+
+        let canonical = path.canonicalize().map_err(|e| Error::Other(e.into()))?;
+
+        Ok(format!("file://{}", canonical.display()))
+    } else {
+        Ok(url)
+    }
 }
 
 pub fn set_remote_url(repo: &Repository, remote_name: &str, url: &str) -> Result<()> {
@@ -53,6 +70,9 @@ mod tests {
             ("/path/to/repo", "repo"),
             ("repo.git", "repo"),
             ("repo", "repo"),
+            // Test with file:// URLs
+            ("file:///path/to/repo.git", "repo"),
+            ("file:///path/to/repo", "repo"),
         ];
 
         for (url, expected) in test_cases {
