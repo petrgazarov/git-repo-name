@@ -1,4 +1,4 @@
-use crate::{config::CONFIG, Error, Result};
+use crate::{config::CONFIG, fs, git, Error, Result};
 use git2::Repository;
 use regex::Regex;
 use reqwest::blocking::Client as ReqwestClient;
@@ -73,44 +73,68 @@ pub fn parse_github_url(url: &str) -> Result<(String, String)> {
     Ok((owner, repo))
 }
 
-fn format_new_remote(original_remote: &str, owner: &str, repo: &str) -> String {
-    if original_remote.starts_with("git@") {
+fn format_new_remote_url(original_remote_url: &str, owner: &str, repo_name: &str) -> String {
+    if original_remote_url.starts_with("git@") {
         // SSH shorthand (e.g. git@github.com:owner/repo.git)
-        format!("git@github.com:{}/{}.git", owner, repo)
-    } else if original_remote.starts_with("ssh://") {
+        format!("git@github.com:{}/{}.git", owner, repo_name)
+    } else if original_remote_url.starts_with("ssh://") {
         // Full SSH URL (e.g. ssh://git@github.com/owner/repo.git)
-        format!("ssh://git@github.com/{}/{}.git", owner, repo)
-    } else if original_remote.starts_with("git://") {
+        format!("ssh://git@github.com/{}/{}.git", owner, repo_name)
+    } else if original_remote_url.starts_with("git://") {
         // Git protocol (e.g. git://github.com/owner/repo.git)
-        format!("git://github.com/{}/{}.git", owner, repo)
+        format!("git://github.com/{}/{}.git", owner, repo_name)
     } else {
         // Otherwise default to HTTPS.
-        format!("https://github.com/{}/{}.git", owner, repo)
+        format!("https://github.com/{}/{}.git", owner, repo_name)
     }
 }
 
-pub fn sync_github_repo(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
-    let (owner, repo_name) = parse_github_url(remote_url)?;
-    let repo_info = get_repo_info(&owner, &repo_name)?;
-    let new_name = repo_info.name;
+pub fn sync_from_github_remote(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
+    let (owner, remote_repo_name) = parse_github_url(remote_url)?;
+    let local_directory_name = repo
+        .workdir()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .file_name()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .to_str()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .to_string();
+    let resolved_repo_name = get_repo_info(&owner, &remote_repo_name)?.name;
 
     let repo_path = repo
         .workdir()
         .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?;
 
-    if repo_name == new_name {
-        println!("Repository is already named correctly");
+    let resolved_remote_url = format_new_remote_url(remote_url, &owner, &resolved_repo_name);
+    let should_rename_directory = local_directory_name != resolved_repo_name;
+    let should_change_remote = resolved_remote_url != remote_url;
+
+    if !should_rename_directory && !should_change_remote {
+        println!("Directory name and remote URL already up-to-date");
         return Ok(());
     }
 
-    let upstream_remote_url = format_new_remote(remote_url, &owner, &repo_name);
-    if upstream_remote_url != remote_url {
+    if should_change_remote {
         let remote = CONFIG.get_remote()?;
-        println!("Updating remote URL to: {}", upstream_remote_url);
-        crate::git::set_remote_url(repo, &remote, &upstream_remote_url)?;
+        if dry_run {
+            println!(
+                "Would change '{}' remote from '{}' to '{}'",
+                remote, remote_url, resolved_remote_url
+            );
+        } else {
+            println!(
+                "Changing '{}' remote from '{}' to '{}'",
+                remote, remote_url, resolved_remote_url
+            );
+            git::set_remote_url(repo, &remote, &resolved_remote_url)?;
+        }
     }
 
-    crate::fs::rename_directory(repo_path, &new_name, dry_run)
+    if should_rename_directory {
+        fs::rename_directory(repo_path, &resolved_repo_name, dry_run)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

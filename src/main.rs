@@ -81,7 +81,7 @@ fn run() -> Result<()> {
             "default-remote" => match value {
                 Some(remote) => {
                     CONFIG.set_default_remote(&remote)?;
-                    println!("Default remote set to: {}", remote);
+                    println!("Default remote set to {}", remote);
                     Ok(())
                 }
                 None => {

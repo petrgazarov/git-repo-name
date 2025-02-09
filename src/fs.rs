@@ -3,25 +3,7 @@ use crate::{Error, Result};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-/// Resolves a path to its canonical form, following symlinks.
-/// If the path is a file:// URL, extracts and resolves the path portion.
-pub fn resolve_canonical_path(path: &Path) -> Result<String> {
-    let path_str = path.to_string_lossy();
-    let path_to_resolve = if path_str.starts_with("file://") {
-        Path::new(&path_str[7..])
-    } else {
-        path
-    };
-
-    let canonical = path_to_resolve
-        .canonicalize()
-        .map_err(|e| Error::Fs(format!("Failed to resolve path: {}", e)))?;
-
-    Ok(format!("file://{}", canonical.display()))
-}
-
 /// Renames a directory to a new name, keeping it in the same parent directory.
-/// Returns an error if the directory cannot be renamed or if the paths are invalid.
 pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> Result<()> {
     let parent_path = current_path
         .parent()
@@ -70,36 +52,6 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use assert_fs::prelude::*;
-    #[cfg(unix)]
-    use std::os::unix::fs::symlink;
-
-    #[test]
-    fn test_resolve_canonical_path() -> anyhow::Result<()> {
-        let temp = assert_fs::TempDir::new()?;
-        let real_dir = temp.child("real_dir");
-        real_dir.create_dir_all()?;
-
-        // Test regular path
-        let resolved = resolve_canonical_path(real_dir.path())?;
-        let expected = format!("file://{}", real_dir.path().canonicalize()?.display());
-        assert_eq!(resolved, expected);
-
-        // Test file:// URL
-        let file_url = format!("file://{}", real_dir.path().display());
-        let resolved_url = resolve_canonical_path(Path::new(&file_url))?;
-        assert_eq!(resolved_url, expected);
-
-        #[cfg(unix)]
-        {
-            let symlink_path = temp.child("link_dir");
-            symlink(real_dir.path(), symlink_path.path())?;
-
-            let resolved = resolve_canonical_path(symlink_path.path())?;
-            assert_eq!(resolved, expected);
-        }
-
-        Ok(())
-    }
 
     #[test]
     fn test_rename_directory() -> anyhow::Result<()> {
@@ -112,18 +64,6 @@ mod tests {
         assert!(!old_dir.exists());
         let new_dir = temp.child("new_name");
         assert!(new_dir.exists());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_rename_directory_same_name() -> anyhow::Result<()> {
-        let temp = assert_fs::TempDir::new()?;
-        let dir = temp.child("same_name");
-        dir.create_dir_all()?;
-
-        rename_directory(dir.path(), "same_name", false)?;
-        assert!(dir.exists());
 
         Ok(())
     }

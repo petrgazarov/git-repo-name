@@ -1,8 +1,12 @@
 pub mod config;
 mod fs;
 pub mod git;
-pub mod github;
+pub mod remotes {
+    pub mod file;
+    pub mod github;
+}
 
+use crate::remotes::{file, github};
 use config::CONFIG;
 use std::path::Path;
 
@@ -65,26 +69,9 @@ pub fn sync(source: Source, dry_run: bool) -> Result<()> {
     match source {
         Source::Remote => {
             if github::is_github_url(&remote_url) {
-                github::sync_github_repo(&repo, &remote_url, dry_run)
+                github::sync_from_github_remote(&repo, &remote_url, dry_run)
             } else {
-                let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
-                let new_name = git::extract_repo_name_from_path(&canonical_path)?;
-
-                let repo_path = repo
-                    .workdir()
-                    .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?;
-
-                if remote_url == canonical_path {
-                    println!("Repository is already named correctly");
-                    return Ok(());
-                }
-
-                if dry_run {
-                    println!("Would rename repository to '{}'", new_name);
-                    return Ok(());
-                }
-
-                fs::rename_directory(repo_path, &new_name, dry_run)
+                file::sync_from_file_remote(&repo, &remote_url, dry_run)
             }
         }
         Source::Local => {
@@ -104,7 +91,7 @@ pub fn fetch_repo_name() -> Result<String> {
         let repo_info = github::get_repo_info(&owner, &repo_name)?;
         Ok(format!("{} ({})", repo_info.name, repo_info.clone_url))
     } else {
-        let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
+        let canonical_path = file::resolve_canonical_path(Path::new(&remote_url))?;
         let name = git::extract_repo_name_from_path(&canonical_path)?;
         Ok(format!("{} ({})", name, canonical_path))
     }
