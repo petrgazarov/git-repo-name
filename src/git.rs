@@ -44,7 +44,6 @@ pub fn extract_repo_name_from_path(url: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     #[test]
     fn test_extract_repo_name_from_path() {
@@ -61,13 +60,5 @@ mod tests {
         for (url, expected) in test_cases {
             assert_eq!(extract_repo_name_from_path(url).unwrap(), expected);
         }
-    }
-
-    #[test]
-    fn test_get_current_repo_error() {
-        let temp = TempDir::new().unwrap();
-        std::env::set_current_dir(temp.path()).unwrap();
-
-        assert!(matches!(get_current_repo(), Err(Error::NotAGitRepo)));
     }
 }

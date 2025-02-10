@@ -121,6 +121,7 @@ mod tests {
 
         common::create_bare_repo(&temp, "upstream_repo.git")?;
 
+        let original_dir = std::env::current_dir()?;
         for url in test_urls {
             let (main_repo_dir, repo) = common::create_main_repo(&temp, "main-repo")?;
 
@@ -140,9 +141,10 @@ mod tests {
             let name = fetch_repo_name()?;
             assert_eq!(name, format!("upstream_repo ({})", expected_url));
 
-            // Clean up main repo
             std::fs::remove_dir_all(&main_repo_dir)?;
         }
+
+        std::env::set_current_dir(&original_dir)?;
 
         Ok(())
     }
@@ -175,6 +177,7 @@ mod tests {
             "git://github.com/owner/test-repo.git",
         ];
 
+        let original_dir = std::env::current_dir()?;
         for (i, url) in test_urls.iter().enumerate() {
             let main_repo_dir = temp.path().join(format!("main-repo-{}", i));
             std::fs::create_dir(&main_repo_dir)?;
@@ -191,7 +194,8 @@ mod tests {
             std::fs::remove_dir_all(&main_repo_dir)?;
         }
 
-        // Clean up env var
+        // Clean up
+        std::env::set_current_dir(&original_dir)?;
         std::env::remove_var("GITHUB_API_BASE_URL");
 
         Ok(())

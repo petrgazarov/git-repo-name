@@ -186,4 +186,50 @@ mod tests {
         assert!(!is_github_url("https://github.com"));
         assert!(!is_github_url("git@github.com:"));
     }
+
+    #[test]
+    fn test_format_new_remote_url() {
+        let cases = vec![
+            // (original_remote_url, owner, repo_name, expected_remote_url)
+            (
+                "git@github.com:oldowner/oldrepo.git",
+                "newowner",
+                "newrepo",
+                "git@github.com:newowner/newrepo.git",
+            ),
+            (
+                "ssh://git@github.com/oldowner/oldrepo.git",
+                "newowner",
+                "newrepo",
+                "ssh://git@github.com/newowner/newrepo.git",
+            ),
+            (
+                "git://github.com/oldowner/oldrepo.git",
+                "newowner",
+                "newrepo",
+                "git://github.com/newowner/newrepo.git",
+            ),
+            (
+                "https://github.com/oldowner/oldrepo.git",
+                "newowner",
+                "newrepo",
+                "https://github.com/newowner/newrepo.git",
+            ),
+            (
+                "https://github.com/oldowner/oldrepo",
+                "newowner",
+                "newrepo",
+                "https://github.com/newowner/newrepo.git",
+            ),
+            (
+                "http://github.com/oldowner/oldrepo.git",
+                "newowner",
+                "newrepo",
+                "https://github.com/newowner/newrepo.git",
+            ),
+        ];
+        for (original, owner, repo_name, expected) in cases {
+            assert_eq!(format_new_remote_url(original, owner, repo_name), expected);
+        }
+    }
 }
