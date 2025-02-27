@@ -5,7 +5,8 @@ pub mod remotes {
     pub mod file;
     pub mod github;
 }
-
+#[cfg(test)]
+mod test_helpers;
 use crate::remotes::{file, github};
 use config::CONFIG;
 use std::path::Path;
@@ -100,16 +101,13 @@ pub fn fetch_repo_name() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers;
     use git2::Repository;
-
-    mod common {
-        include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/common.rs"));
-    }
 
     #[test]
     fn test_fetch_repo_name_filesystem() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
-        common::setup_test_config(temp.path())?;
+        test_helpers::setup_test_config(temp.path())?;
 
         let test_urls = [
             ("../upstream_repo.git"),
@@ -119,11 +117,11 @@ mod tests {
             (&format!("file://{}", temp.path().join("upstream_repo.git").display())),
         ];
 
-        common::create_bare_repo(&temp, "upstream_repo.git")?;
+        test_helpers::create_bare_repo(&temp, "upstream_repo.git")?;
 
         let original_dir = std::env::current_dir()?;
         for url in test_urls {
-            let (main_repo_dir, repo) = common::create_main_repo(&temp, "main-repo")?;
+            let (main_repo_dir, repo) = test_helpers::create_main_repo(&temp, "main-repo")?;
 
             // Needed for relative path test case to work
             std::env::set_current_dir(&main_repo_dir)?;
@@ -152,7 +150,7 @@ mod tests {
     #[test]
     fn test_fetch_repo_name_github() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
-        common::setup_test_config(temp.path())?;
+        test_helpers::setup_test_config(temp.path())?;
 
         // Set up mock server
         let mut server = mockito::Server::new();

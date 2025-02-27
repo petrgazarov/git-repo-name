@@ -1,5 +1,9 @@
+#![allow(dead_code)]
+
 use assert_fs::TempDir;
+use gag::BufferRedirect;
 use ini::Ini;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Sets up a test config directory with a mock GitHub token.
@@ -35,4 +39,46 @@ pub fn create_main_repo(temp: &TempDir, dir: &str) -> anyhow::Result<(PathBuf, g
     std::fs::create_dir(&repo_dir)?;
     let repo = git2::Repository::init(&repo_dir)?;
     Ok((repo_dir, repo))
+}
+
+pub fn get_canonical_remote_url(repo_path: &Path) -> anyhow::Result<String> {
+    let canonical_repo_path = repo_path.canonicalize()?;
+    let canonical_remote_url = format!("file://{}", canonical_repo_path.display());
+    Ok(canonical_remote_url)
+}
+
+/// Captures stdout while executing the given function and returns the captured output.
+pub fn capture_stdout<F, R>(f: F) -> crate::Result<(String, R)>
+where
+    F: FnOnce() -> crate::Result<R>,
+{
+    let mut captured = String::new();
+    let result = {
+        let mut stdout = BufferRedirect::stdout().map_err(|e| crate::Error::Fs(e.to_string()))?;
+        let result = f()?;
+        stdout
+            .read_to_string(&mut captured)
+            .map_err(|e| crate::Error::Fs(e.to_string()))?;
+        result
+    };
+    Ok((captured, result))
+}
+
+/// A RAII guard that restores the original working directory when dropped.
+pub struct CurrentDirGuard {
+    original: PathBuf,
+}
+
+impl CurrentDirGuard {
+    pub fn new() -> Self {
+        let original = std::env::current_dir().expect("Failed to get current working directory");
+        Self { original }
+    }
+}
+
+impl Drop for CurrentDirGuard {
+    fn drop(&mut self) {
+        std::env::set_current_dir(&self.original)
+            .expect("Failed to restore original working directory");
+    }
 }

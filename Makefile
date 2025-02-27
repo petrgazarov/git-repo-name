@@ -1,7 +1,8 @@
 .PHONY: test run
 
 test:
-	cargo test -- --test-threads=1 $(ARGS)
+  # --nocapture is needed for tests that assert stdout
+	cargo test -- --test-threads=1 --nocapture $(ARGS)
 
 run:
 	cargo run -- $(ARGS)
