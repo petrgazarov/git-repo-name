@@ -15,7 +15,7 @@ pub fn sync_from_file_remote(repo: &Repository, remote_url: &str, dry_run: bool)
         .to_str()
         .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
         .to_string();
-    let canonical_path = resolve_canonical_path(Path::new(&remote_url))?;
+    let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
     let resolved_repo_name = git::extract_repo_name_from_path(&canonical_path)?;
 
     let repo_path = repo
@@ -54,22 +54,6 @@ pub fn sync_from_file_remote(repo: &Repository, remote_url: &str, dry_run: bool)
     Ok(())
 }
 
-/// Resolves a file path to its canonical form, following symlinks.
-pub fn resolve_canonical_path(path: &Path) -> Result<String> {
-    let path_str = path.to_string_lossy();
-    let path_to_resolve = if path_str.starts_with("file://") {
-        Path::new(&path_str[7..])
-    } else {
-        path
-    };
-
-    let canonical = path_to_resolve
-        .canonicalize()
-        .map_err(|e| Error::Fs(format!("Failed to resolve path: {}", e)))?;
-
-    Ok(format!("file://{}", canonical.display()))
-}
-
 /// Formats a new path from a canonical path, keeping the format of the original remote URL.
 pub fn format_new_remote_url(original_remote_url: &str, canonical_path: &str) -> Result<String> {
     // If the original URL is relative and it is equivalent to the given canonical_path (without canonicalization),
@@ -98,38 +82,6 @@ pub fn format_new_remote_url(original_remote_url: &str, canonical_path: &str) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_fs::prelude::*;
-    #[cfg(unix)]
-    use std::os::unix::fs::symlink;
-    use std::path::Path;
-
-    #[test]
-    fn test_resolve_canonical_path() -> anyhow::Result<()> {
-        let temp = assert_fs::TempDir::new()?;
-        let real_dir = temp.child("real_dir");
-        real_dir.create_dir_all()?;
-
-        // Test regular path
-        let resolved = resolve_canonical_path(real_dir.path())?;
-        let expected = format!("file://{}", real_dir.path().canonicalize()?.display());
-        assert_eq!(resolved, expected);
-
-        // Test file:// URL
-        let file_url = format!("file://{}", real_dir.path().display());
-        let resolved_url = resolve_canonical_path(Path::new(&file_url))?;
-        assert_eq!(resolved_url, expected);
-
-        #[cfg(unix)]
-        {
-            let symlink_path = temp.child("link_dir");
-            symlink(real_dir.path(), symlink_path.path())?;
-
-            let resolved = resolve_canonical_path(symlink_path.path())?;
-            assert_eq!(resolved, expected);
-        }
-
-        Ok(())
-    }
 
     #[test]
     fn test_format_new_remote_url() -> anyhow::Result<()> {
@@ -173,7 +125,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod sync_tests {
+mod sync_from_file_remote_tests {
     use super::*;
     use crate::test_helpers;
     use assert_fs::prelude::*;
@@ -399,7 +351,7 @@ mod sync_tests {
     }
 
     #[test]
-    fn test_sync_both_updates_actual() -> anyhow::Result<()> {
+    fn test_sync_both_updates() -> anyhow::Result<()> {
         let fixture = SyncTestFixture::new("new-name.git", "old-name")?;
         let relative_remote_url = "file://../new-name.git";
         fixture.setup_remote(relative_remote_url)?;

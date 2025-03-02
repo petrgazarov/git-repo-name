@@ -92,7 +92,7 @@ pub fn fetch_repo_name() -> Result<String> {
         let repo_info = github::get_repo_info(&owner, &repo_name)?;
         Ok(format!("{} ({})", repo_info.name, repo_info.clone_url))
     } else {
-        let canonical_path = file::resolve_canonical_path(Path::new(&remote_url))?;
+        let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
         let name = git::extract_repo_name_from_path(&canonical_path)?;
         Ok(format!("{} ({})", name, canonical_path))
     }
