@@ -20,8 +20,8 @@ enum Commands {
     /// Sync local directory name with remote repository name
     Sync {
         /// Specify whether remote or local
-        #[arg(short, long, default_value = "remote")]
-        source: String,
+        #[arg(short, long, value_enum, default_value_t = Source::Remote)]
+        source: Source,
 
         /// Override the default git remote
         #[arg(long)]
@@ -50,8 +50,7 @@ fn run() -> Result<()> {
             if let Some(remote_name) = remote {
                 CONFIG.set_remote(remote_name);
             }
-            let name = fetch_repo_name()?;
-            println!("{}", name);
+            fetch_repo_name()?;
             Ok(())
         }
         Commands::Sync {
@@ -62,7 +61,6 @@ fn run() -> Result<()> {
             if let Some(remote_name) = remote {
                 CONFIG.set_remote(remote_name);
             }
-            let source = Source::try_from(source.as_str())?;
             sync(source, dry_run)
         }
         Commands::Config { key, value } => match key.as_str() {

@@ -41,7 +41,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Represents the source of truth for the repository name
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
 pub enum Source {
     Remote,
     Local,
@@ -86,16 +86,19 @@ pub fn fetch_repo_name() -> Result<String> {
     let repo = git::get_current_repo()?;
     let remote = CONFIG.get_remote()?;
     let remote_url = git::get_remote_url(&repo, &remote)?;
+    let result;
 
     if github::is_github_url(&remote_url) {
         let (owner, repo_name) = github::parse_github_url(&remote_url)?;
         let repo_info = github::get_repo_info(&owner, &repo_name)?;
-        Ok(format!("{} ({})", repo_info.name, repo_info.clone_url))
+        result = format!("{} ({})", repo_info.name, repo_info.clone_url);
     } else {
         let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
         let name = git::extract_repo_name_from_path(&canonical_path)?;
-        Ok(format!("{} ({})", name, canonical_path))
+        result = format!("{} ({})", name, canonical_path);
     }
+    println!("{}", result);
+    Ok(result)
 }
 
 #[cfg(test)]
