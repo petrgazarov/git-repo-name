@@ -154,23 +154,7 @@ mod tests {
     fn test_fetch_repo_name_github() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
         test_helpers::setup_test_config(temp.path())?;
-
-        // Set up mock server
-        let mut server = mockito::Server::new();
-        let _ = server
-            .mock("GET", "/repos/owner/test-repo")
-            .match_header("authorization", "token mock-token")
-            .with_status(200)
-            .with_body(
-                r#"{
-                "name": "upstream-repo",
-                "full_name": "owner/upstream-repo",
-                "clone_url": "https://github.com/owner/upstream-repo.git"
-            }"#,
-            )
-            .create();
-
-        std::env::set_var("GITHUB_API_BASE_URL", &server.url());
+        test_helpers::mock_github_repo("owner", "owner", "test-repo", "upstream-repo");
 
         let test_urls = [
             "https://github.com/owner/test-repo.git",

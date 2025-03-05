@@ -3,6 +3,7 @@ use git2::Repository;
 use regex::Regex;
 use reqwest::blocking::Client as ReqwestClient;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
+use reqwest::StatusCode;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -13,30 +14,44 @@ pub struct GitHubRepo {
 }
 
 pub fn get_repo_info(owner: &str, repo: &str) -> Result<GitHubRepo> {
-    let client = create_client()?;
     let base_url = std::env::var("GITHUB_API_BASE_URL")
         .unwrap_or_else(|_| "https://api.github.com".to_string());
     let url = format!("{}/repos/{}/{}", base_url, owner, repo);
 
-    client
-        .get(&url)
-        .send()
-        .map_err(|e| Error::GitHubApi(e.to_string()))?
-        .error_for_status()
-        .map_err(|e| Error::GitHubApi(e.to_string()))?
-        .json()
-        .map_err(|e| Error::GitHubApi(e.to_string()))
+    let token = CONFIG.get_github_token().ok();
+    let client = create_client(token.as_deref())?;
+    let response = client.get(&url).send();
+
+    match response {
+        Ok(resp) => {
+            if resp.status() == StatusCode::NOT_FOUND {
+                // GitHub returns 404 for private repos when unauthorized
+                Err(Error::GitHubApi(
+                    "Repository not found. If this is a private repository, please configure a GitHub token with 'git repo-name config github-token YOUR_TOKEN'".to_string(),
+                ))
+            } else {
+                // Process successful response
+                match resp.error_for_status() {
+                    Ok(resp) => resp.json().map_err(|e| Error::GitHubApi(e.to_string())),
+                    Err(e) => Err(Error::GitHubApi(e.to_string())),
+                }
+            }
+        }
+        Err(e) => Err(Error::GitHubApi(e.to_string())),
+    }
 }
 
-fn create_client() -> Result<ReqwestClient> {
-    let token = CONFIG.get_github_token()?;
+fn create_client(token: Option<&str>) -> Result<ReqwestClient> {
     let mut headers = HeaderMap::new();
 
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("token {}", token))
-            .map_err(|e| Error::GitHubApi(e.to_string()))?,
-    );
+    // Add authorization header only if token is provided
+    if let Some(token_str) = token {
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("token {}", token_str))
+                .map_err(|e| Error::GitHubApi(e.to_string()))?,
+        );
+    }
 
     headers.insert(USER_AGENT, HeaderValue::from_static("git-repo-name"));
 
@@ -235,6 +250,63 @@ mod tests {
             assert_eq!(format_new_remote_url(original, owner, repo_name), expected);
         }
     }
+
+    #[test]
+    fn test_get_repo_info() -> anyhow::Result<()> {
+        use crate::config::CONFIG;
+        use crate::test_helpers;
+        use assert_fs::TempDir;
+
+        // Create a temp dir for test config
+        let temp = TempDir::new()?;
+        test_helpers::setup_test_config(temp.path())?;
+
+        // Directory guard to restore working directory when test completes
+        let _guard = test_helpers::CurrentDirGuard::new();
+
+        // Test data
+        let owner = "test-owner";
+        let repo = "test-repo";
+
+        // Mock the GitHub API response for public repo
+        test_helpers::mock_github_repo(owner, owner, repo, repo);
+
+        // Test unauthenticated request - remove the token
+        {
+            // Clear the token in our test configuration
+            CONFIG.set_github_token("")?;
+
+            // Test with no token
+            let result = get_repo_info(owner, repo);
+            assert!(
+                result.is_ok(),
+                "Expected success for public repo with unauthenticated request"
+            );
+        }
+
+        // Setup a mock that returns 404 for private repo
+        let private_repo = format!("{}-private", repo);
+        test_helpers::mock_github_error(owner, &private_repo, 404);
+
+        // Test private repo with unauthenticated request
+        {
+            // Still using empty token
+            let result = get_repo_info(owner, &private_repo);
+            assert!(
+                result.is_err(),
+                "Expected error for private repo with unauthenticated request"
+            );
+
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("private repository"),
+                "Error should mention private repository, got: {}",
+                err
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -242,16 +314,13 @@ mod sync_from_github_remote_tests {
     use super::*;
     use crate::test_helpers;
     use assert_fs::prelude::*;
-    use mockito::{Mock, ServerGuard};
     use predicates::prelude::*;
-    use std::env;
 
     // Test fixture to reduce repetition in tests
     struct SyncTestFixture {
         temp: assert_fs::TempDir,
         repo_dir: std::path::PathBuf,
         repo: git2::Repository,
-        mock_server: ServerGuard,
         _guard: test_helpers::CurrentDirGuard,
     }
 
@@ -265,15 +334,10 @@ mod sync_from_github_remote_tests {
             let (repo_dir, repo) = test_helpers::create_main_repo(&temp, local_repo_name)?;
             std::env::set_current_dir(&repo_dir)?;
 
-            // Start a mock server
-            let mock_server = mockito::Server::new();
-            env::set_var("GITHUB_API_BASE_URL", mock_server.url());
-
             Ok(Self {
                 temp,
                 repo_dir,
                 repo,
-                mock_server,
                 _guard: guard,
             })
         }
@@ -323,44 +387,24 @@ mod sync_from_github_remote_tests {
 
         // Mock GitHub API response for a repository
         fn mock_github_repo(
-            &mut self,
+            &self,
             old_owner: &str,
             new_owner: &str,
             old_repo_name: &str,
             new_repo_name: &str,
-        ) -> Mock {
-            let response_body = serde_json::json!({
-                "name": new_repo_name,
-                "full_name": format!("{}/{}", new_owner, new_repo_name),
-                // GitHub API always returns HTTPS URLs regardless of the request URL format
-                "clone_url": format!("https://github.com/{}/{}.git", new_owner, new_repo_name)
-            });
-
-            self.mock_server
-                .mock(
-                    "GET",
-                    format!("/repos/{}/{}", old_owner, old_repo_name).as_str(),
-                )
-                .with_status(200)
-                .with_header("content-type", "application/json")
-                .with_body(response_body.to_string())
-                .create()
+        ) {
+            test_helpers::mock_github_repo(old_owner, new_owner, old_repo_name, new_repo_name)
         }
 
         // Mock GitHub API error response
-        fn mock_github_error(&mut self, owner: &str, repo: &str, status: usize) -> Mock {
-            self.mock_server
-                .mock("GET", format!("/repos/{}/{}", owner, repo).as_str())
-                .with_status(status)
-                .with_header("content-type", "application/json")
-                .with_body(r#"{"message": "Not Found"}"#)
-                .create()
+        fn mock_github_error(&self, owner: &str, repo: &str, status: usize) {
+            test_helpers::mock_github_error(owner, repo, status)
         }
     }
 
     #[test]
     fn test_sync_up_to_date_dry_run() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("test-repo")?;
+        let fixture = SyncTestFixture::new("test-repo")?;
         let remote_url = "https://github.com/owner/test-repo.git";
 
         // Set up the mock to return the same repo name
@@ -388,7 +432,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_up_to_date() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("test-repo")?;
+        let fixture = SyncTestFixture::new("test-repo")?;
         let remote_url = "https://github.com/owner/test-repo.git";
 
         // Set up the mock to return the same repo name
@@ -416,7 +460,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_remote_url_update_dry_run() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("repo-name")?;
+        let fixture = SyncTestFixture::new("repo-name")?;
         let old_url = "git@github.com:old-owner/repo-name.git";
         let expected_new_url = "git@github.com:new-owner/repo-name.git";
 
@@ -448,7 +492,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_remote_url_update() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("repo-name")?;
+        let fixture = SyncTestFixture::new("repo-name")?;
         let old_url = "git@github.com:old-owner/repo-name.git";
         let expected_new_url = "git@github.com:new-owner/repo-name.git";
 
@@ -480,7 +524,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_directory_rename_dry_run() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("old-name")?;
+        let fixture = SyncTestFixture::new("old-name")?;
         let remote_url = "https://github.com/owner/new-name.git";
 
         // Set up the mock to return a different repo name
@@ -514,7 +558,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_directory_rename() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("old-name")?;
+        let fixture = SyncTestFixture::new("old-name")?;
         let remote_url = "https://github.com/owner/new-name.git";
 
         // Set up the mock to return a different repo name
@@ -549,7 +593,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_both_updates_dry_run() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("old-name")?;
+        let fixture = SyncTestFixture::new("old-name")?;
         let old_url = "git@github.com:old-owner/old-name.git";
         let expected_new_url = "git@github.com:new-owner/new-name.git";
 
@@ -593,7 +637,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_both_updates() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("old-name")?;
+        let fixture = SyncTestFixture::new("old-name")?;
         let old_url = "git@github.com:old-owner/old-name.git";
         let expected_new_url = "git@github.com:new-owner/new-name.git";
 
@@ -665,7 +709,7 @@ mod sync_from_github_remote_tests {
         ];
 
         for url in test_cases {
-            let mut fixture = SyncTestFixture::new("test-repo")?;
+            let fixture = SyncTestFixture::new("test-repo")?;
 
             // Set up the mock to return the same repo name
             fixture.mock_github_repo("owner", "owner", "test-repo", "test-repo");
@@ -683,7 +727,7 @@ mod sync_from_github_remote_tests {
 
     #[test]
     fn test_sync_nonexistent_github_repo() -> anyhow::Result<()> {
-        let mut fixture = SyncTestFixture::new("test-repo")?;
+        let fixture = SyncTestFixture::new("test-repo")?;
         let remote_url = "git@github.com:owner/test-repo.git";
 
         // Set up the mock to return 404
@@ -697,8 +741,8 @@ mod sync_from_github_remote_tests {
         match result {
             Err(e) => {
                 assert!(
-                    e.to_string().contains("404"),
-                    "Expected 404 error message, got: {}",
+                    e.to_string().contains("Repository not found"),
+                    "Expected 'Repository not found' error message, got: {}",
                     e
                 );
                 Ok(())

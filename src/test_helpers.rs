@@ -3,6 +3,7 @@
 use assert_fs::TempDir;
 use gag::BufferRedirect;
 use ini::Ini;
+use mockito;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -81,4 +82,51 @@ impl Drop for CurrentDirGuard {
         std::env::set_current_dir(&self.original)
             .expect("Failed to restore original working directory");
     }
+}
+
+/// Mock GitHub API response for a repository.
+pub fn mock_github_repo(
+    old_owner: &str,
+    new_owner: &str,
+    old_repo_name: &str,
+    new_repo_name: &str,
+) {
+    let mut server = mockito::Server::new();
+    std::env::set_var("GITHUB_API_BASE_URL", server.url());
+
+    let response_body = serde_json::json!({
+        "name": new_repo_name,
+        "full_name": format!("{}/{}", new_owner, new_repo_name),
+        // GitHub API always returns HTTPS URLs regardless of the request URL format
+        "clone_url": format!("https://github.com/{}/{}.git", new_owner, new_repo_name)
+    });
+
+    let _mock = server
+        .mock(
+            "GET",
+            format!("/repos/{}/{}", old_owner, old_repo_name).as_str(),
+        )
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(response_body.to_string())
+        .create();
+
+    // Server will be kept alive until it goes out of scope at the end of the test
+    std::mem::forget(server);
+}
+
+/// Mock GitHub API error response.
+pub fn mock_github_error(owner: &str, repo: &str, status: usize) {
+    let mut server = mockito::Server::new();
+    std::env::set_var("GITHUB_API_BASE_URL", server.url());
+
+    let _mock = server
+        .mock("GET", format!("/repos/{}/{}", owner, repo).as_str())
+        .with_status(status)
+        .with_header("content-type", "application/json")
+        .with_body(r#"{"message": "Not Found"}"#)
+        .create();
+
+    // Server will be kept alive until it goes out of scope at the end of the test
+    std::mem::forget(server);
 }
