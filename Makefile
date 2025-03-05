@@ -8,4 +8,4 @@ run:
 	cargo run -- $(ARGS)
 
 build_release:
-	cargo build --release
+	cargo build --release $(ARGS)
