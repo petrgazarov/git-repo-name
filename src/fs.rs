@@ -64,8 +64,6 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
         const PROTECTED_DACL_SECURITY_INFORMATION:
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x80000000);
-        const NO_INHERITANCE: windows::Win32::Security::NO_INHERITANCE =
-            windows::Win32::Security::NO_INHERITANCE(0);
         const TRUSTEE_IS_NAME: windows::Win32::Security::Authorization::TRUSTEE_FORM =
             windows::Win32::Security::Authorization::TRUSTEE_FORM(1);
         const TRUSTEE_IS_USER: windows::Win32::Security::Authorization::TRUSTEE_TYPE =
@@ -77,6 +75,8 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
             SE_FILE_OBJECT, TRUSTEE_W,
         };
+        use windows::Win32::Security::ACL;
+        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
         use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
@@ -84,10 +84,10 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             // Get current user name
             let mut name_buffer = [0u16; 256];
             let mut size = name_buffer.len() as u32;
-            if !GetUserNameW(Some(PWSTR(name_buffer.as_mut_ptr())), &mut size) {
+            if let Err(e) = GetUserNameW(Some(PWSTR(name_buffer.as_mut_ptr())), &mut size) {
                 return Err(Error::Fs(format!(
-                    "Failed to get current username: error code {}",
-                    GetLastError().0
+                    "Failed to get current username: error code {:?}",
+                    e
                 )));
             }
 
@@ -95,7 +95,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             let mut ea = EXPLICIT_ACCESS_W::default();
             ea.grfAccessPermissions = FILE_GENERIC_READ.0 | FILE_GENERIC_WRITE.0;
             ea.grfAccessMode = SET_ACCESS;
-            ea.grfInheritance = NO_INHERITANCE;
+            ea.grfInheritance = windows::Win32::Security::NO_INHERITANCE;
             // Configure trustee (the user account to give access)
             ea.Trustee = TRUSTEE_W {
                 pMultipleTrustee: ptr::null_mut(),
@@ -248,8 +248,8 @@ mod tests {
             let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
             path_wide.push(0); // Null terminate
 
-            let mut dacl_ptr: *mut core::ffi::c_void = ptr::null_mut();
-            let mut security_descriptor: *mut core::ffi::c_void = ptr::null_mut();
+            let mut dacl_ptr: Option<*mut ACL> = None;
+            let mut security_descriptor: *mut SECURITY_DESCRIPTOR = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
