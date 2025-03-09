@@ -8,7 +8,33 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test on ${{ matrix.os }} ${{ matrix.arch_name }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: darwin
+            rust_target: x86_64-apple-darwin
+            arch_name: x64
+            runner: macos-13
+          - os: darwin
+            rust_target: aarch64-apple-darwin
+            arch_name: arm64
+            runner: macos-latest
+          - os: linux
+            rust_target: x86_64-unknown-linux-gnu
+            arch_name: x64
+            runner: ubuntu-latest
+          - os: linux
+            rust_target: aarch64-unknown-linux-gnu
+            arch_name: arm64
+            runner: ubuntu-24.04-arm
+          - os: windows
+            rust_target: x86_64-pc-windows-msvc
+            arch_name: x64
+            runner: windows-latest
 
     steps:
       - name: Checkout code
@@ -18,6 +44,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          target: ${{ matrix.rust_target }}
 
       - name: Run tests
-        run: make test
+        shell: bash
+        run: make test ARGS="--target ${{ matrix.rust_target }}"
