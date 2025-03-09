@@ -52,16 +52,22 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
     #[cfg(windows)]
     {
-        use std::ffi::OsString;
-        use std::os::windows::ffi::OsStringExt;
         use std::ptr;
-        use windows::Win32::Foundation::{GetLastError, PSID, PWSTR};
+        use windows::core::PWSTR;
+        use windows::Win32::Foundation::{GetLastError, WIN32_ERROR};
         use windows::Win32::Security::Authorization::{
-            GetUserNameW, SetEntriesInAclW, SetNamedSecurityInfoW, DACL_SECURITY_INFORMATION,
-            EXPLICIT_ACCESS_W, NO_INHERITANCE, PROTECTED_DACL_SECURITY_INFORMATION, SET_ACCESS,
-            SE_FILE_OBJECT, TRUSTEE_IS_NAME, TRUSTEE_IS_USER, TRUSTEE_W,
+            SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
+            SE_FILE_OBJECT,
         };
-        use windows::Win32::Security::{ACL, FILE_GENERIC_READ, FILE_GENERIC_WRITE};
+        use windows::Win32::Security::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
+        use windows::Win32::Security::ACL;
+        use windows::Win32::Security::PSID;
+        use windows::Win32::Security::{
+            GetUserNameW, DACL_SECURITY_INFORMATION, NO_INHERITANCE,
+            PROTECTED_DACL_SECURITY_INFORMATION, SET_ACCESS, TRUSTEE_IS_NAME, TRUSTEE_IS_USER,
+            TRUSTEE_W,
+        };
+        use windows::Win32::System::Memory::LocalFree;
 
         unsafe {
             // Get current user name
@@ -82,19 +88,19 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             // Configure trustee (the user account to give access)
             ea.Trustee = TRUSTEE_W {
                 pMultipleTrustee: ptr::null_mut(),
-                MultipleTrusteeOperation: 0,
-                TrusteeForm: TRUSTEE_IS_NAME.0 as u32,
-                TrusteeType: TRUSTEE_IS_USER.0 as u32,
+                MultipleTrusteeOperation: MULTIPLE_TRUSTEE_OPERATION(0),
+                TrusteeForm: TRUSTEE_IS_NAME,
+                TrusteeType: TRUSTEE_IS_USER,
                 ptstrName: PWSTR(name_buffer.as_mut_ptr()),
             };
 
             // Create a new ACL containing this single ACE
             let mut new_acl_ptr: *mut ACL = ptr::null_mut();
-            let result = SetEntriesInAclW(1, &ea, ptr::null_mut(), &mut new_acl_ptr);
+            let result = SetEntriesInAclW(Some(&[ea]), None, &mut new_acl_ptr);
 
-            if result != 0 {
+            if result != WIN32_ERROR(0) {
                 return Err(Error::Fs(format!(
-                    "Failed to create ACL: error code {}",
+                    "Failed to create ACL: error code {:?}",
                     result
                 )));
             }
@@ -110,18 +116,17 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 security_info,
-                ptr::null_mut(), // owner
-                ptr::null_mut(), // group
-                new_acl_ptr,     // dacl
-                ptr::null_mut(), // sacl
+                None,              // owner
+                None,              // group
+                Some(new_acl_ptr), // dacl
+                None,              // sacl
             );
 
-            // Free the allocated ACL memory regardless of success
-            windows::Win32::System::Memory::LocalFree(new_acl_ptr as isize);
+            LocalFree(new_acl_ptr as isize);
 
-            if result != 0 {
+            if result != WIN32_ERROR(0) {
                 return Err(Error::Fs(format!(
-                    "Failed to set file permissions: error code {}",
+                    "Failed to set file permissions: error code {:?}",
                     result
                 )));
             }
@@ -270,22 +275,23 @@ mod tests {
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                ptr::null_mut(),          // owner
-                ptr::null_mut(),          // group
-                &mut dacl_ptr,            // dacl
-                ptr::null_mut(),          // sacl
-                &mut security_descriptor, // security descriptor
+                None,                           // owner
+                None,                           // group
+                Some(&mut dacl_ptr),            // dacl
+                None,                           // sacl
+                Some(&mut security_descriptor), // security descriptor
             );
 
             assert_eq!(
-                result, 0,
-                "Failed to get security info with error code {}",
+                result,
+                WIN32_ERROR(0),
+                "Failed to get security info with error code {:?}",
                 result
             );
             assert!(!dacl_ptr.is_null(), "DACL should not be null");
 
             // Free the security descriptor
-            windows::Win32::System::Memory::LocalFree(security_descriptor as isize);
+            LocalFree(security_descriptor as isize);
         }
 
         Ok(())
