@@ -70,6 +70,7 @@ jobs:
           fi
 
       - name: Build binary
+        shell: bash
         run: |
           make build_release ARGS="--target ${{ matrix.rust_target }}"
 
