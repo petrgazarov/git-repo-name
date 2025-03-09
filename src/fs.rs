@@ -226,6 +226,7 @@ mod tests {
         use windows::core::PWSTR;
         use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
         use windows::Win32::Security::ACL;
+        use windows::Win32::Security::PSECURITY_DESCRIPTOR;
         use windows::Win32::Security::SECURITY_DESCRIPTOR;
         // Use local constants defined as in set_secure_permissions
         const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
