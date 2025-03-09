@@ -74,9 +74,6 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
             SE_FILE_OBJECT, TRUSTEE_W,
         };
-        use windows::Win32::Security::ACL;
-        use windows::Win32::Security::PSECURITY_DESCRIPTOR;
-        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
         use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
@@ -122,16 +119,14 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
             // Apply the ACL to the file, replacing existing ACL and disabling inheritance
             let security_info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
-            let mut security_descriptor: PSECURITY_DESCRIPTOR = ptr::null_mut();
             let result = SetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 security_info,
-                None,                                   // owner
-                None,                                   // group
-                Some(new_acl_ptr),                      // dacl
-                None,                                   // sacl
-                ptr::addr_of_mut!(security_descriptor), // security descriptor
+                None,              // owner
+                None,              // group
+                Some(new_acl_ptr), // dacl
+                None,              // sacl
             );
 
             LocalFree(new_acl_ptr as isize);
@@ -253,7 +248,7 @@ mod tests {
             path_wide.push(0); // Null terminate
 
             let mut dacl_ptr: *mut ACL = ptr::null_mut();
-            let mut security_descriptor: PSECURITY_DESCRIPTOR = ptr::null_mut();
+            let mut security_descriptor: *mut PSECURITY_DESCRIPTOR = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
