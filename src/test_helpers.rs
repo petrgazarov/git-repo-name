@@ -130,3 +130,35 @@ pub fn mock_github_error(owner: &str, repo: &str, status: usize) {
     // Server will be kept alive until it goes out of scope at the end of the test
     std::mem::forget(server);
 }
+
+/// Normalizes a path string for test comparisons.
+/// Converts backslashes to forward slashes, removes UNC prefixes,
+/// and trims trailing slashes to ensure consistent test comparisons.
+pub fn normalize_for_test(path_str: &str) -> String {
+    let s = path_str.replace('\\', "/");
+    let s = if s.starts_with("//?/") {
+        s.replacen("//?/", "", 1)
+    } else {
+        s
+    };
+    s.trim_end_matches('/').to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_for_test() {
+        assert_eq!(normalize_for_test(r"C:\path\to\file"), "C:/path/to/file");
+        assert_eq!(
+            normalize_for_test(r"//?/C:/path/to/file"),
+            "C:/path/to/file"
+        );
+        assert_eq!(normalize_for_test("/path/to/file/"), "/path/to/file");
+        assert_eq!(
+            normalize_for_test(r"\\server\share\path"),
+            "//server/share/path"
+        );
+    }
+}

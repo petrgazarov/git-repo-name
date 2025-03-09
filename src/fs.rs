@@ -15,12 +15,9 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
         .ok_or_else(|| Error::Fs("Cannot get parent directory".into()))?;
     let new_path = parent_path.join(new_name);
 
-    // Convert paths to strings and remove any trailing slashes for display
-    let current_display = current_path
-        .to_string_lossy()
-        .trim_end_matches('/')
-        .to_string();
-    let new_display = new_path.to_string_lossy().trim_end_matches('/').to_string();
+    // Use native path display for user output
+    let current_display = current_path.display().to_string();
+    let new_display = new_path.display().to_string();
 
     if dry_run {
         println!(
@@ -40,6 +37,18 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
             "Target path '{}' already exists",
             new_display
         )));
+    }
+
+    // On Windows, if the current directory is inside the directory we want to rename, change it to the parent directory
+    #[cfg(windows)]
+    {
+        let current_dir = std::env::current_dir()
+            .map_err(|e| Error::Fs(format!("Failed to get current directory: {}", e)))?;
+        if current_dir.starts_with(current_path) {
+            std::env::set_current_dir(parent_path).map_err(|e| {
+                Error::Fs(format!("Failed to change directory before renaming: {}", e))
+            })?;
+        }
     }
 
     std::fs::rename(current_path, new_path)

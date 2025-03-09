@@ -5,6 +5,8 @@ use std::path::Path;
 #[cfg(test)]
 #[path = "../test_helpers.rs"]
 mod test_helpers;
+#[cfg(test)]
+use test_helpers::normalize_for_test;
 
 pub fn sync_from_file_remote(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
     let local_directory_name = repo
@@ -285,15 +287,19 @@ mod sync_from_file_remote_tests {
         fixture.setup_remote(&remote_url)?;
 
         let output = fixture.run_sync(&remote_url, true)?;
-
         let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
 
+        // The message has the pattern "Would rename directory from 'X' to 'Y'"
+        // We'll check if it's present in the output with flexible matching
+        let normalized_output = normalize_for_test(&output);
+        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+
         assert!(
-            output.contains(&format!(
-                "Would rename directory from '{}' to '{}'",
-                parent_dir.join("old-name").display(),
-                parent_dir.join("new-name").display()
-            )),
+            normalized_output.contains("Would rename directory from '")
+                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
+                && normalized_output.contains("' to '")
+                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
             "Expected directory rename message, got: {}",
             output
         );
@@ -309,7 +315,24 @@ mod sync_from_file_remote_tests {
         let remote_url = fixture.canonical_remote_url.clone();
         fixture.setup_remote(&remote_url)?;
 
-        fixture.run_sync(&remote_url, false)?;
+        let output = fixture.run_sync(&remote_url, false)?;
+
+        let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
+
+        // The message has the pattern "Renaming directory from 'X' to 'Y'..."
+        // We'll check if it's present in the output with more flexible matching
+        let normalized_output = normalize_for_test(&output);
+        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+
+        assert!(
+            normalized_output.contains("Renaming directory from '")
+                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
+                && normalized_output.contains("' to '")
+                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
+            "Expected directory rename message, got: {}",
+            output
+        );
 
         fixture.assert_directory_exists("new-name", false)?;
 
@@ -323,23 +346,28 @@ mod sync_from_file_remote_tests {
         fixture.setup_remote(relative_remote_url)?;
 
         let output = fixture.run_sync(relative_remote_url, true)?;
-
         let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
 
+        // Add back the directory rename assertion
         assert!(
-            output.contains(&format!(
+            normalize_for_test(&output).contains(&normalize_for_test(&format!(
                 "Would change 'origin' remote from '{}' to '{}'",
                 relative_remote_url, fixture.canonical_remote_url
-            )),
+            ))),
             "Expected remote URL update message, got: {}",
             output
         );
+
+        // Now check for directory rename message - more flexible matching
+        let normalized_output = normalize_for_test(&output);
+        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+
         assert!(
-            output.contains(&format!(
-                "Would rename directory from '{}' to '{}'",
-                parent_dir.join("old-name").display(),
-                parent_dir.join("new-name").display()
-            )),
+            normalized_output.contains("Would rename directory from '")
+                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
+                && normalized_output.contains("' to '")
+                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
             "Expected directory rename message, got: {}",
             output
         );
@@ -374,8 +402,17 @@ mod sync_from_file_remote_tests {
         // Assert the specific error type and message
         match result {
             Err(Error::Fs(msg)) => {
+                #[cfg(unix)]
                 assert!(
                     msg.starts_with("Failed to resolve path: No such file or directory"),
+                    "Expected error about nonexistent path, got: {}",
+                    msg
+                );
+                #[cfg(windows)]
+                assert!(
+                    msg.starts_with(
+                        "Failed to resolve path: The system cannot find the path specified"
+                    ),
                     "Expected error about nonexistent path, got: {}",
                     msg
                 );

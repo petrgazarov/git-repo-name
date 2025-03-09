@@ -2,6 +2,7 @@ use crate::{Error, Result};
 use ini::Ini;
 use once_cell::sync::Lazy;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::RwLock;
 
@@ -12,7 +13,7 @@ pub struct Config {
     config_values: RwLock<ConfigValues>,
 }
 
-// Separate struct for the actual config values
+/// Internal configuration values that are loaded from the config file.
 #[derive(Clone)]
 struct ConfigValues {
     github_token: Option<String>,
@@ -23,16 +24,17 @@ struct ConfigValues {
 
 impl Config {
     pub fn new() -> Result<Self> {
-        let config_dir = if cfg!(unix) {
-            env::var_os("XDG_CONFIG_HOME")
-                .map(PathBuf::from)
-                .or_else(|| {
-                    env::var_os("HOME").map(|home| PathBuf::from(home).join(".config"))
-                })
-                .ok_or_else(|| Error::Config("Could not determine config directory: neither XDG_CONFIG_HOME nor HOME is set".into()))?
-        } else {
-            dirs::config_dir().ok_or_else(|| Error::Config("Could not determine config directory".into()))?
-        }.join("git-repo-name");
+        #[cfg(test)]
+        let config_dir = Self::test_config_dir()?;
+
+        #[cfg(not(test))]
+        let config_dir = Self::production_config_dir()?;
+
+        // Ensure the config directory exists
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir)
+                .map_err(|e| Error::Config(format!("Failed to create config directory: {}", e)))?;
+        }
 
         let config = Self {
             config_dir,
@@ -43,7 +45,7 @@ impl Config {
             }),
         };
 
-        // Load values from disk if file exists
+        // Check if config file exists and load it if it does
         let config_file = config.get_config_file_path();
         if config_file.exists() {
             let ini = Ini::load_from_file(&config_file)
@@ -55,6 +57,42 @@ impl Config {
         }
 
         Ok(config)
+    }
+
+    /// Get the config directory path for test environments
+    #[cfg(test)]
+    fn test_config_dir() -> Result<PathBuf> {
+        // In tests, prioritize TEST_CONFIG_DIR env var if set
+        if let Some(test_dir) = env::var_os("TEST_CONFIG_DIR") {
+            return Ok(PathBuf::from(test_dir).join("git-repo-name"));
+        }
+
+        // Otherwise, generate a new temporary directory with a unique suffix
+        let unique_dir = std::env::temp_dir().join(format!(
+            "git-repo-name-test-config-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        ));
+        Ok(unique_dir)
+    }
+
+    /// Get the config directory path for production environments
+    #[cfg(not(test))]
+    fn production_config_dir() -> Result<PathBuf> {
+        // Normal platform-specific logic
+        let base_dir = if cfg!(unix) {
+            env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
+                .ok_or_else(|| Error::Config("Could not determine config directory".into()))?
+        } else {
+            dirs::config_dir()
+                .ok_or_else(|| Error::Config("Could not determine config directory".into()))?
+        };
+
+        Ok(base_dir.join("git-repo-name"))
     }
 
     fn load_from_ini(&self, ini: &Ini) -> Result<()> {
@@ -93,6 +131,7 @@ impl Config {
             .map_err(|e| Error::Config(format!("Failed to write config file: {}", e)))?;
 
         crate::fs::set_secure_permissions(&config_file)?;
+
         Ok(())
     }
 
@@ -242,11 +281,9 @@ mod tests {
 
     #[test]
     fn test_malformed_config_file() -> anyhow::Result<()> {
-        use std::env;
         let temp = assert_fs::TempDir::new()?;
-        // Set temporary config directory for Config::new
-        env::set_var("XDG_CONFIG_HOME", temp.path());
-        // The config file will be located at "$XDG_CONFIG_HOME/git-repo-name/config"
+        std::env::set_var("TEST_CONFIG_DIR", temp.path());
+        // The config file will be located at "$TEST_CONFIG_DIR/git-repo-name/config"
         let config_file = temp.child("git-repo-name").child("config");
         if let Some(parent) = config_file.path().parent() {
             std::fs::create_dir_all(parent)?;
@@ -262,37 +299,42 @@ mod tests {
         );
 
         // Clean up the environment variable
-        env::remove_var("XDG_CONFIG_HOME");
+        env::remove_var("TEST_CONFIG_DIR");
 
         Ok(())
     }
 
     #[test]
     fn test_config_file_initial_creation() -> anyhow::Result<()> {
-        use std::env;
         let temp = assert_fs::TempDir::new()?;
-        env::set_var("XDG_CONFIG_HOME", temp.path());
-        
-        // The config file will be located at "$XDG_CONFIG_HOME/git-repo-name/config"
+        std::env::set_var("TEST_CONFIG_DIR", temp.path());
+
+        // The config file will be located at "$TEST_CONFIG_DIR/git-repo-name/config"
         let config_file = temp.child("git-repo-name").child("config");
         config_file.assert(predicate::path::missing());
-        
+
         // Calling Config::new should create the config file
         let config = Config::new()?;
         config_file.assert(predicate::path::exists());
-        
+
         // Check that the default remote is as expected
         assert_eq!(config.get_remote()?, "origin");
-        env::remove_var("XDG_CONFIG_HOME");
+        env::remove_var("TEST_CONFIG_DIR");
         Ok(())
     }
 
     #[test]
     fn test_config_creates_parent_directories() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
-        let nested_config_dir = temp.path().join("deeply/nested/config/dir");
+        let config_dir = temp
+            .path()
+            .join("var")
+            .join("lib")
+            .join("nonexistent")
+            .join("git-repo-name");
+        std::env::set_var("TEST_CONFIG_DIR", temp.path());
         let config = Config {
-            config_dir: nested_config_dir,
+            config_dir: config_dir,
             config_values: RwLock::new(ConfigValues {
                 github_token: None,
                 default_remote: "origin".to_string(),
@@ -304,7 +346,13 @@ mod tests {
         config.write_to_disk()?;
 
         // Verify the config file and its parent directories were created
-        let config_file = temp.path().join("deeply/nested/config/dir/config");
+        let config_file = temp
+            .path()
+            .join("var")
+            .join("lib")
+            .join("nonexistent")
+            .join("git-repo-name")
+            .join("config");
         assert!(config_file.exists());
         assert!(config_file.is_file());
         assert!(config_file.parent().unwrap().exists());
