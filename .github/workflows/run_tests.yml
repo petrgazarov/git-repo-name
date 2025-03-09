@@ -48,4 +48,4 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: make test ARGS="--target ${{ matrix.rust_target }}"
+        run: make test CARGO_OPTS="--target ${{ matrix.rust_target }}"
