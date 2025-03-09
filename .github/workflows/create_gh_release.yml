@@ -1,0 +1,131 @@
+name: Create GH release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  get-version:
+    name: Set version
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Get version
+        id: version
+        run: echo "value=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build for ${{ matrix.os }} ${{ matrix.arch_name }}
+    needs: get-version
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - os: darwin
+            rust_target: x86_64-apple-darwin
+            arch_name: x64
+
+          - os: darwin
+            rust_target: aarch64-apple-darwin
+            arch_name: arm64
+
+          - os: linux
+            rust_target: x86_64-unknown-linux-gnu
+            arch_name: x64
+
+          - os: linux
+            rust_target: aarch64-unknown-linux-gnu
+            arch_name: arm64
+
+          - os: windows
+            rust_target: x86_64-pc-windows-msvc
+            arch_name: x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.rust_target }}
+
+      - name: Get binary name
+        id: get-binary-name
+        run: |
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            echo "value=git-repo-name-${{ needs.get-version.outputs.value }}-${{ matrix.rust_target }}.exe" >> $GITHUB_OUTPUT
+          else
+            echo "value=git-repo-name-${{ needs.get-version.outputs.value }}-${{ matrix.rust_target }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build binary
+        run: |
+          make build_release ARGS="--target ${{ matrix.rust_target }}"
+
+          # Copy the binary to the root directory with the appropriate name
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cp target/${{ matrix.rust_target }}/release/git-repo-name.exe ${{ steps.get-binary-name.outputs.value }}
+          else
+            cp target/${{ matrix.rust_target }}/release/git-repo-name ${{ steps.get-binary-name.outputs.value }}
+          fi
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.get-binary-name.outputs.value }}
+          path: ${{ steps.get-binary-name.outputs.value }}
+          if-no-files-found: error
+
+  verify-version:
+    name: Verify version
+    needs: [get-version, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: git-repo-name-${{ needs.get-version.outputs.value }}-x86_64-unknown-linux-gnu
+
+      - name: Verify version
+        run: |
+          version_from_tag=${{ needs.get-version.outputs.value }}
+          chmod +x ./git-repo-name-$version_from_tag-x86_64-unknown-linux-gnu
+          version_from_binary=$(./git-repo-name-$version_from_tag-x86_64-unknown-linux-gnu --version | cut -d ' ' -f 2)
+
+          if [ "$version_from_binary" != "$version_from_tag" ]; then
+            echo "Version mismatch: $version_from_binary != $version_from_tag"
+            exit 1
+          fi
+
+  create-release:
+    name: Create draft release
+    needs: [get-version, build, verify-version]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        env:
+          VERSION: ${{ needs.get-version.outputs.value }}
+        with:
+          draft: true
+          prerelease: ${{ contains(github.ref, '-rc') }}
+          fail_on_unmatched_files: true
+          files: |
+            git-repo-name-${{ env.VERSION }}-x86_64-apple-darwin
+            git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin
+            git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu
+            git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu
+            git-repo-name-${{ env.VERSION }}-x86_64-pc-windows-msvc.exe
