@@ -3,6 +3,11 @@ use crate::{Error, Result};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
+#[cfg(windows)]
+extern "system" {
+    fn LocalFree(hMem: isize) -> isize;
+}
+
 /// Renames a directory to a new name, keeping it in the same parent directory.
 pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> Result<()> {
     let parent_path = current_path
@@ -52,22 +57,21 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
     #[cfg(windows)]
     {
+        const SET_ACCESS: u32 = 2;
+        const DACL_SECURITY_INFORMATION: u32 = 0x00000004;
+        const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x80000000;
+        const NO_INHERITANCE: u32 = 0;
+        const TRUSTEE_IS_NAME: u32 = 1;
+        const TRUSTEE_IS_USER: u32 = 1;
         use std::ptr;
         use windows::core::PWSTR;
-        use windows::Win32::Foundation::{GetLastError, WIN32_ERROR};
+        use windows::Win32::Foundation::GetLastError;
         use windows::Win32::Security::Authorization::{
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
-            SE_FILE_OBJECT,
+            SE_FILE_OBJECT, TRUSTEE_W,
         };
-        use windows::Win32::Security::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
-        use windows::Win32::Security::ACL;
-        use windows::Win32::Security::PSID;
-        use windows::Win32::Security::{
-            GetUserNameW, DACL_SECURITY_INFORMATION, NO_INHERITANCE,
-            PROTECTED_DACL_SECURITY_INFORMATION, SET_ACCESS, TRUSTEE_IS_NAME, TRUSTEE_IS_USER,
-            TRUSTEE_W,
-        };
-        use windows::Win32::System::Memory::LocalFree;
+        use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
+        use windows::Win32::System::UserProfile::GetUserNameW;
 
         unsafe {
             // Get current user name
@@ -95,10 +99,9 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             };
 
             // Create a new ACL containing this single ACE
-            let mut new_acl_ptr: *mut ACL = ptr::null_mut();
+            let mut new_acl_ptr: *mut _ = ptr::null_mut();
             let result = SetEntriesInAclW(Some(&[ea]), None, &mut new_acl_ptr);
-
-            if result != WIN32_ERROR(0) {
+            if result != 0 {
                 return Err(Error::Fs(format!(
                     "Failed to create ACL: error code {:?}",
                     result
@@ -123,8 +126,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             );
 
             LocalFree(new_acl_ptr as isize);
-
-            if result != WIN32_ERROR(0) {
+            if result != 0 {
                 return Err(Error::Fs(format!(
                     "Failed to set file permissions: error code {:?}",
                     result
@@ -241,16 +243,14 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(windows)]
     #[test]
+    #[cfg(windows)]
     fn test_set_secure_permissions_windows() -> anyhow::Result<()> {
-        use assert_fs::prelude::*;
         use std::ptr;
-        use windows::Win32::Foundation::PWSTR;
-        use windows::Win32::Security::Authorization::{
-            GetNamedSecurityInfoW, DACL_SECURITY_INFORMATION, SE_FILE_OBJECT,
-        };
-        use windows::Win32::Security::ACL;
+        use windows::core::PWSTR;
+        use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
+        // Use local constants defined as in set_secure_permissions
+        const DACL_SECURITY_INFORMATION: u32 = 0x00000004;
 
         // Create a temporary file
         let temp = assert_fs::TempDir::new()?;
@@ -268,23 +268,22 @@ mod tests {
             let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
             path_wide.push(0); // Null terminate
 
-            let mut dacl_ptr: *mut ACL = ptr::null_mut();
-            let mut security_descriptor: *mut std::ffi::c_void = ptr::null_mut();
+            let mut dacl_ptr: *mut _ = ptr::null_mut();
+            let mut security_descriptor: *mut _ = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                None,                           // owner
-                None,                           // group
-                Some(&mut dacl_ptr),            // dacl
-                None,                           // sacl
-                Some(&mut security_descriptor), // security descriptor
+                ptr::null_mut(),          // owner
+                ptr::null_mut(),          // group
+                &mut dacl_ptr,            // dacl
+                ptr::null_mut(),          // sacl
+                &mut security_descriptor, // security descriptor
             );
 
             assert_eq!(
-                result,
-                WIN32_ERROR(0),
+                result, 0,
                 "Failed to get security info with error code {:?}",
                 result
             );
