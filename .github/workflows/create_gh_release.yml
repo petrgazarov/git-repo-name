@@ -56,9 +56,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-
-      - name: Install cross
-        run: cargo install cross
+          target: ${{ matrix.rust_target }}
 
       - name: Get binary name
         id: get-binary-name
