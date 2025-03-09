@@ -57,19 +57,19 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
     #[cfg(windows)]
     {
-        const SET_ACCESS: Win32::Security::Authorization::ACCESS_MODE =
-            Win32::Security::Authorization::ACCESS_MODE(2);
+        const SET_ACCESS: windows::Win32::Security::Authorization::ACCESS_MODE =
+            windows::Win32::Security::Authorization::ACCESS_MODE(2);
         const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
         const PROTECTED_DACL_SECURITY_INFORMATION:
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x80000000);
-        const NO_INHERITANCE: Win32::Security::Authorization::INHERITANCE_FLAGS =
-            Win32::Security::Authorization::INHERITANCE_FLAGS(0);
-        const TRUSTEE_IS_NAME: Win32::Security::Authorization::TRUSTEE_FORM =
-            Win32::Security::Authorization::TRUSTEE_FORM(1);
-        const TRUSTEE_IS_USER: Win32::Security::Authorization::TRUSTEE_TYPE =
-            Win32::Security::Authorization::TRUSTEE_TYPE(1);
+        const NO_INHERITANCE: windows::Win32::Security::Authorization::INHERITANCE_FLAGS =
+            windows::Win32::Security::Authorization::INHERITANCE_FLAGS(0);
+        const TRUSTEE_IS_NAME: windows::Win32::Security::Authorization::TRUSTEE_FORM =
+            windows::Win32::Security::Authorization::TRUSTEE_FORM(1);
+        const TRUSTEE_IS_USER: windows::Win32::Security::Authorization::TRUSTEE_TYPE =
+            windows::Win32::Security::Authorization::TRUSTEE_TYPE(1);
         use std::ptr;
         use windows::core::PWSTR;
         use windows::Win32::Foundation::GetLastError;
