@@ -61,6 +61,7 @@ jobs:
 
       - name: Get binary name
         id: get-binary-name
+        shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows" ]; then
             echo "value=git-repo-name-${{ needs.get-version.outputs.value }}-${{ matrix.rust_target }}.exe" >> $GITHUB_OUTPUT
