@@ -57,7 +57,7 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
                 Error::Fs(format!("Failed to change directory before renaming: {}", e))
             })?;
 
-            Some((current_dir, rel_path.to_path_buf()))
+            Some((current_dir.clone(), rel_path.to_path_buf()))
         } else {
             None
         }
