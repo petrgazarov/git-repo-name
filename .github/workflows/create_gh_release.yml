@@ -69,7 +69,7 @@ jobs:
 
       - name: Build binary
         run: |
-          cross build --release --target ${{ matrix.rust_target }}
+          make build_release ARGS="--target ${{ matrix.rust_target }}"
 
           # Copy the binary to the root directory with the appropriate name
           if [ "${{ matrix.os }}" = "windows" ]; then
