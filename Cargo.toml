@@ -27,6 +27,8 @@ windows = { version = "0.60.0", features = [
   "Win32_Foundation",
   "Win32_Security_Authorization",
   "Win32_System_Memory",
+  "Win32_Storage",
+  "Win32_System",
 ] }
 
 [dev-dependencies]
