@@ -250,7 +250,7 @@ mod tests {
 
             let mut dacl_ptr: *mut ACL = ptr::null_mut();
             let mut security_descriptor: PSECURITY_DESCRIPTOR =
-                ptr::null_mut::<SECURITY_DESCRIPTOR>();
+                PSECURITY_DESCRIPTOR(ptr::null_mut::<SECURITY_DESCRIPTOR>());
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
