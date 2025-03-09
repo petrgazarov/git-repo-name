@@ -254,11 +254,11 @@ mod tests {
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                Some(ptr::null_mut()),                // owner
-                Some(ptr::null_mut()),                // group
-                Some(&mut dacl_ptr as *mut *mut ACL), // dacl
-                Some(ptr::null_mut()),                // sacl
-                &mut security_descriptor as *mut *mut SECURITY_DESCRIPTOR, // security descriptor
+                Some(ptr::null_mut()),                                 // owner
+                Some(ptr::null_mut()),                                 // group
+                Some(&mut dacl_ptr as *mut *mut ACL),                  // dacl
+                Some(ptr::null_mut()),                                 // sacl
+                &mut security_descriptor as *mut PSECURITY_DESCRIPTOR, // security descriptor
             );
 
             assert_eq!(
