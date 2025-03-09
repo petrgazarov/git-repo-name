@@ -142,6 +142,7 @@ mod tests {
             let name = fetch_repo_name()?;
             assert_eq!(name, format!("upstream_repo ({})", expected_url));
 
+            std::env::set_current_dir(&original_dir)?;
             std::fs::remove_dir_all(&main_repo_dir)?;
         }
 
@@ -176,6 +177,7 @@ mod tests {
                 "upstream-repo (https://github.com/owner/upstream-repo.git)"
             );
 
+            std::env::set_current_dir(&original_dir)?;
             std::fs::remove_dir_all(&main_repo_dir)?;
         }
 
