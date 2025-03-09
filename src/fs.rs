@@ -74,7 +74,6 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
             SE_FILE_OBJECT, TRUSTEE_W,
         };
-        use windows::Win32::Security::ACL;
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
         use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
@@ -248,18 +247,18 @@ mod tests {
             let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
             path_wide.push(0); // Null terminate
 
-            let mut dacl_ptr: Option<*mut ACL> = None;
+            let mut dacl_ptr: *mut ACL = ptr::null_mut();
             let mut security_descriptor: *mut SECURITY_DESCRIPTOR = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                Some(ptr::null_mut()),    // owner
-                Some(ptr::null_mut()),    // group
-                &mut dacl_ptr,            // dacl
-                Some(ptr::null_mut()),    // sacl
-                &mut security_descriptor, // security descriptor
+                Some(ptr::null_mut()),                // owner
+                Some(ptr::null_mut()),                // group
+                Some(&mut dacl_ptr as *mut *mut ACL), // dacl
+                Some(ptr::null_mut()),                // sacl
+                &mut security_descriptor as *mut *mut SECURITY_DESCRIPTOR, // security descriptor
             );
 
             assert_eq!(
