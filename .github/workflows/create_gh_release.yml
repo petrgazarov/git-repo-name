@@ -59,14 +59,11 @@ jobs:
           target: ${{ matrix.rust_target }}
 
       # Install cross-compilation dependencies for Linux ARM64
-      - name: Install OpenSSL dependencies for Linux ARM64
+      - name: Install dependencies for Linux ARM64
         if: matrix.rust_target == 'aarch64-unknown-linux-gnu'
         run: |
-          sudo dpkg --add-architecture arm64
           sudo apt-get update
           sudo apt-get install -y pkg-config gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-          sudo apt-get install -y libssl-dev:arm64
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
 
       - name: Get binary name
         id: get-binary-name
@@ -79,7 +76,15 @@ jobs:
 
       - name: Build binary
         run: |
-          make build_release ARGS="--target ${{ matrix.rust_target }}"
+          if [ "${{ matrix.rust_target }}" = "x86_64-unknown-linux-gnu" ]; then
+            # Only use default features for native Linux builds
+            make build_release ARGS="--target ${{ matrix.rust_target }}"
+          else
+            # For all cross-compiled targets, use rustls-tls instead of OpenSSL
+            export PKG_CONFIG_ALLOW_CROSS=1
+            export OPENSSL_DIR=/usr
+            make build_release ARGS="--target ${{ matrix.rust_target }} --no-default-features --features=rustls-tls"
+          fi
 
           # Copy the binary to the root directory with the appropriate name
           if [ "${{ matrix.os }}" = "windows" ]; then
