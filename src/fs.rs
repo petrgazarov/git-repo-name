@@ -41,18 +41,43 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
 
     // On Windows, if the current directory is inside the directory we want to rename, change it to the parent directory
     #[cfg(windows)]
-    {
+    let original_dir_opt = {
         let current_dir = std::env::current_dir()
             .map_err(|e| Error::Fs(format!("Failed to get current directory: {}", e)))?;
+
+        // If current directory is within the directory we're renaming
         if current_dir.starts_with(current_path) {
+            // Calculate the relative path from the directory we're renaming to the current directory
+            let rel_path = current_dir
+                .strip_prefix(current_path)
+                .map_err(|e| Error::Fs(format!("Failed to calculate relative path: {}", e)))?;
+
+            // Change to parent directory to avoid "directory in use" errors
             std::env::set_current_dir(parent_path).map_err(|e| {
                 Error::Fs(format!("Failed to change directory before renaming: {}", e))
             })?;
-        }
-    }
 
-    std::fs::rename(current_path, new_path)
+            Some((current_dir, rel_path.to_path_buf()))
+        } else {
+            None
+        }
+    };
+
+    std::fs::rename(current_path, &new_path)
         .map_err(|e| Error::Fs(format!("Failed to rename directory: {}", e)))?;
+
+    // Return to a corresponding directory inside the renamed directory
+    #[cfg(windows)]
+    if let Some((original_dir, rel_path)) = original_dir_opt {
+        // Path to new location is new_path + relative path
+        let new_current_dir = new_path.join(rel_path);
+
+        // Try to change back to the new location, falling back to the original if we can't
+        let _ = std::env::set_current_dir(&new_current_dir).or_else(|_| {
+            // If we can't change to the new directory, go back to the original
+            std::env::set_current_dir(original_dir)
+        });
+    }
 
     Ok(())
 }

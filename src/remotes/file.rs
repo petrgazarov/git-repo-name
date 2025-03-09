@@ -133,7 +133,7 @@ mod sync_from_file_remote_tests {
     use assert_fs::prelude::*;
     use predicates::prelude::*;
 
-    // Test fixture to reduce repetition in tests
+    /// Test fixture to reduce repetition in tests
     struct SyncTestFixture {
         temp: assert_fs::TempDir,
         bare_repo_path: std::path::PathBuf,
