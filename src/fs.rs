@@ -74,6 +74,9 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
             SE_FILE_OBJECT, TRUSTEE_W,
         };
+        use windows::Win32::Security::ACL;
+        use windows::Win32::Security::PSECURITY_DESCRIPTOR;
+        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
         use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
@@ -119,14 +122,16 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
             // Apply the ACL to the file, replacing existing ACL and disabling inheritance
             let security_info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+            let mut security_descriptor: PSECURITY_DESCRIPTOR = ptr::null_mut();
             let result = SetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 security_info,
-                None,              // owner
-                None,              // group
-                Some(new_acl_ptr), // dacl
-                None,              // sacl
+                None,                                   // owner
+                None,                                   // group
+                Some(new_acl_ptr),                      // dacl
+                None,                                   // sacl
+                ptr::addr_of_mut!(security_descriptor), // security descriptor
             );
 
             LocalFree(new_acl_ptr as isize);
@@ -227,7 +232,6 @@ mod tests {
         use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
         use windows::Win32::Security::ACL;
         use windows::Win32::Security::PSECURITY_DESCRIPTOR;
-        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         // Use local constants defined as in set_secure_permissions
         const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
@@ -249,17 +253,17 @@ mod tests {
             path_wide.push(0); // Null terminate
 
             let mut dacl_ptr: *mut ACL = ptr::null_mut();
-            let mut security_descriptor: *mut SECURITY_DESCRIPTOR = ptr::null_mut();
+            let mut security_descriptor: PSECURITY_DESCRIPTOR = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                Some(ptr::null_mut()),                                 // owner
-                Some(ptr::null_mut()),                                 // group
-                Some(&mut dacl_ptr as *mut *mut ACL),                  // dacl
-                Some(ptr::null_mut()),                                 // sacl
-                &mut security_descriptor as *mut PSECURITY_DESCRIPTOR, // security descriptor
+                Some(ptr::null_mut()),                  // owner
+                Some(ptr::null_mut()),                  // group
+                Some(&mut dacl_ptr as *mut *mut ACL),   // dacl
+                Some(ptr::null_mut()),                  // sacl
+                ptr::addr_of_mut!(security_descriptor), // security descriptor
             );
 
             assert_eq!(
