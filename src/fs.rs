@@ -70,13 +70,11 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             windows::Win32::Security::Authorization::TRUSTEE_TYPE(1);
         use std::ptr;
         use windows::core::PWSTR;
-        use windows::Win32::Foundation::GetLastError;
         use windows::Win32::Security::Authorization::{
             SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, MULTIPLE_TRUSTEE_OPERATION,
             SE_FILE_OBJECT, TRUSTEE_W,
         };
         use windows::Win32::Security::ACL;
-        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
         use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
@@ -228,6 +226,8 @@ mod tests {
         use std::ptr;
         use windows::core::PWSTR;
         use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
+        use windows::Win32::Security::ACL;
+        use windows::Win32::Security::SECURITY_DESCRIPTOR;
         // Use local constants defined as in set_secure_permissions
         const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
@@ -255,10 +255,10 @@ mod tests {
                 PWSTR(path_wide.as_mut_ptr()),
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                ptr::null_mut(),          // owner
-                ptr::null_mut(),          // group
+                Some(ptr::null_mut()),    // owner
+                Some(ptr::null_mut()),    // group
                 &mut dacl_ptr,            // dacl
-                ptr::null_mut(),          // sacl
+                Some(ptr::null_mut()),    // sacl
                 &mut security_descriptor, // security descriptor
             );
 
