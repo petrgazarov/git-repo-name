@@ -2,10 +2,10 @@
 
 test:
   # --nocapture is needed for tests that assert stdout
-	cargo test -- --test-threads=1 --nocapture $(ARGS)
+	cargo test $(CARGO_OPTS) -- --test-threads=1 --nocapture $(ARGS)
 
 run:
-	cargo run -- $(ARGS)
+	cargo run $(CARGO_OPTS) -- $(ARGS)
 
 build_release:
-	cargo build --release $(ARGS)
+	cargo build --release $(CARGO_OPTS)

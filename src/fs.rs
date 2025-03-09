@@ -44,11 +44,89 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
 }
 
 /// Sets secure file permissions (600 on Unix systems).
-/// On non-Unix systems, this is a no-op.
+/// On Windows, creates an ACL that only allows the current user to access the file.
 pub fn set_secure_permissions(path: &Path) -> Result<()> {
     #[cfg(unix)]
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
         .map_err(|e| Error::Fs(format!("Failed to set file permissions: {}", e)))?;
+
+    #[cfg(windows)]
+    {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+        use std::ptr;
+        use windows::Win32::Foundation::{GetLastError, PSID, PWSTR};
+        use windows::Win32::Security::Authorization::{
+            GetUserNameW, SetEntriesInAclW, SetNamedSecurityInfoW, DACL_SECURITY_INFORMATION,
+            EXPLICIT_ACCESS_W, NO_INHERITANCE, PROTECTED_DACL_SECURITY_INFORMATION, SET_ACCESS,
+            SE_FILE_OBJECT, TRUSTEE_IS_NAME, TRUSTEE_IS_USER, TRUSTEE_W,
+        };
+        use windows::Win32::Security::{ACL, FILE_GENERIC_READ, FILE_GENERIC_WRITE};
+
+        unsafe {
+            // Get current user name
+            let mut name_buffer = [0u16; 256];
+            let mut size = name_buffer.len() as u32;
+            if !GetUserNameW(PWSTR(name_buffer.as_mut_ptr()), &mut size) {
+                return Err(Error::Fs(format!(
+                    "Failed to get current username: error code {}",
+                    GetLastError().0
+                )));
+            }
+
+            // Create an EXPLICIT_ACCESS entry for the current user with read/write rights
+            let mut ea = EXPLICIT_ACCESS_W::default();
+            ea.grfAccessPermissions = FILE_GENERIC_READ.0 | FILE_GENERIC_WRITE.0;
+            ea.grfAccessMode = SET_ACCESS;
+            ea.grfInheritance = NO_INHERITANCE;
+            // Configure trustee (the user account to give access)
+            ea.Trustee = TRUSTEE_W {
+                pMultipleTrustee: ptr::null_mut(),
+                MultipleTrusteeOperation: 0,
+                TrusteeForm: TRUSTEE_IS_NAME.0 as u32,
+                TrusteeType: TRUSTEE_IS_USER.0 as u32,
+                ptstrName: PWSTR(name_buffer.as_mut_ptr()),
+            };
+
+            // Create a new ACL containing this single ACE
+            let mut new_acl_ptr: *mut ACL = ptr::null_mut();
+            let result = SetEntriesInAclW(1, &ea, ptr::null_mut(), &mut new_acl_ptr);
+
+            if result != 0 {
+                return Err(Error::Fs(format!(
+                    "Failed to create ACL: error code {}",
+                    result
+                )));
+            }
+
+            // Convert path to wide string for Windows API
+            let path_str = path.to_string_lossy().to_string();
+            let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
+            path_wide.push(0); // Null terminate
+
+            // Apply the ACL to the file, replacing existing ACL and disabling inheritance
+            let security_info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+            let result = SetNamedSecurityInfoW(
+                PWSTR(path_wide.as_mut_ptr()),
+                SE_FILE_OBJECT,
+                security_info,
+                ptr::null_mut(), // owner
+                ptr::null_mut(), // group
+                new_acl_ptr,     // dacl
+                ptr::null_mut(), // sacl
+            );
+
+            // Free the allocated ACL memory regardless of success
+            windows::Win32::System::Memory::LocalFree(new_acl_ptr as isize);
+
+            if result != 0 {
+                return Err(Error::Fs(format!(
+                    "Failed to set file permissions: error code {}",
+                    result
+                )));
+            }
+        }
+    }
 
     Ok(())
 }
@@ -153,6 +231,61 @@ mod tests {
 
             let resolved = resolve_canonical_path(symlink_path.path())?;
             assert_eq!(resolved, expected);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_set_secure_permissions_windows() -> anyhow::Result<()> {
+        use assert_fs::prelude::*;
+        use std::ptr;
+        use windows::Win32::Foundation::PWSTR;
+        use windows::Win32::Security::Authorization::{
+            GetNamedSecurityInfoW, DACL_SECURITY_INFORMATION, SE_FILE_OBJECT,
+        };
+        use windows::Win32::Security::ACL;
+
+        // Create a temporary file
+        let temp = assert_fs::TempDir::new()?;
+        let test_file = temp.child("secure.txt");
+        test_file.write_str("Secret data")?;
+
+        // Apply secure permissions
+        super::set_secure_permissions(test_file.path())?;
+
+        // Verify permissions on Windows by checking that an ACL exists
+        // We can't easily validate the exact contents, but we can verify that
+        // GetNamedSecurityInfoW doesn't fail
+        unsafe {
+            let path_str = test_file.path().to_string_lossy().to_string();
+            let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
+            path_wide.push(0); // Null terminate
+
+            let mut dacl_ptr: *mut ACL = ptr::null_mut();
+            let mut security_descriptor: *mut std::ffi::c_void = ptr::null_mut();
+
+            let result = GetNamedSecurityInfoW(
+                PWSTR(path_wide.as_mut_ptr()),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                ptr::null_mut(),          // owner
+                ptr::null_mut(),          // group
+                &mut dacl_ptr,            // dacl
+                ptr::null_mut(),          // sacl
+                &mut security_descriptor, // security descriptor
+            );
+
+            assert_eq!(
+                result, 0,
+                "Failed to get security info with error code {}",
+                result
+            );
+            assert!(!dacl_ptr.is_null(), "DACL should not be null");
+
+            // Free the security descriptor
+            windows::Win32::System::Memory::LocalFree(security_descriptor as isize);
         }
 
         Ok(())
