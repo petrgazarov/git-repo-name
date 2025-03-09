@@ -249,8 +249,9 @@ mod tests {
             path_wide.push(0); // Null terminate
 
             let mut dacl_ptr: *mut ACL = ptr::null_mut();
-            let mut security_descriptor: PSECURITY_DESCRIPTOR =
-                PSECURITY_DESCRIPTOR(ptr::null_mut::<SECURITY_DESCRIPTOR>());
+            let mut security_descriptor: PSECURITY_DESCRIPTOR = PSECURITY_DESCRIPTOR(
+                ptr::null_mut::<SECURITY_DESCRIPTOR>() as *mut core::ffi::c_void,
+            );
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
@@ -272,7 +273,7 @@ mod tests {
             assert!(!dacl_ptr.is_null(), "DACL should not be null");
 
             // Free the security descriptor
-            LocalFree(security_descriptor as isize);
+            LocalFree(security_descriptor.0 as isize);
         }
 
         Ok(())
