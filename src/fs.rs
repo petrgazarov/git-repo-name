@@ -57,12 +57,19 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
 
     #[cfg(windows)]
     {
-        const SET_ACCESS: u32 = 2;
-        const DACL_SECURITY_INFORMATION: u32 = 0x00000004;
-        const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x80000000;
-        const NO_INHERITANCE: u32 = 0;
-        const TRUSTEE_IS_NAME: u32 = 1;
-        const TRUSTEE_IS_USER: u32 = 1;
+        const SET_ACCESS: Win32::Security::Authorization::ACCESS_MODE =
+            Win32::Security::Authorization::ACCESS_MODE(2);
+        const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
+            windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
+        const PROTECTED_DACL_SECURITY_INFORMATION:
+            windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
+            windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x80000000);
+        const NO_INHERITANCE: Win32::Security::Authorization::INHERITANCE_FLAGS =
+            Win32::Security::Authorization::INHERITANCE_FLAGS(0);
+        const TRUSTEE_IS_NAME: Win32::Security::Authorization::TRUSTEE_FORM =
+            Win32::Security::Authorization::TRUSTEE_FORM(1);
+        const TRUSTEE_IS_USER: Win32::Security::Authorization::TRUSTEE_TYPE =
+            Win32::Security::Authorization::TRUSTEE_TYPE(1);
         use std::ptr;
         use windows::core::PWSTR;
         use windows::Win32::Foundation::GetLastError;
@@ -71,7 +78,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             SE_FILE_OBJECT, TRUSTEE_W,
         };
         use windows::Win32::Storage::FileSystem::{FILE_GENERIC_READ, FILE_GENERIC_WRITE};
-        use windows::Win32::System::UserProfile::GetUserNameW;
+        use windows::Win32::System::WindowsProgramming::GetUserNameW;
 
         unsafe {
             // Get current user name
@@ -101,7 +108,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             // Create a new ACL containing this single ACE
             let mut new_acl_ptr: *mut _ = ptr::null_mut();
             let result = SetEntriesInAclW(Some(&[ea]), None, &mut new_acl_ptr);
-            if result != 0 {
+            if result != windows::Win32::Foundation::WIN32_ERROR(0) {
                 return Err(Error::Fs(format!(
                     "Failed to create ACL: error code {:?}",
                     result
@@ -222,7 +229,8 @@ mod tests {
         use windows::core::PWSTR;
         use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
         // Use local constants defined as in set_secure_permissions
-        const DACL_SECURITY_INFORMATION: u32 = 0x00000004;
+        const DACL_SECURITY_INFORMATION: u32 =
+            windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
 
         // Create a temporary file
         let temp = assert_fs::TempDir::new()?;
@@ -255,7 +263,8 @@ mod tests {
             );
 
             assert_eq!(
-                result, 0,
+                result,
+                windows::Win32::Foundation::WIN32_ERROR(0),
                 "Failed to get security info with error code {:?}",
                 result
             );
