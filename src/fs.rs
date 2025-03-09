@@ -64,8 +64,8 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
         const PROTECTED_DACL_SECURITY_INFORMATION:
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x80000000);
-        const NO_INHERITANCE: windows::Win32::Security::Authorization::INHERITANCE_FLAGS =
-            windows::Win32::Security::Authorization::INHERITANCE_FLAGS(0);
+        const NO_INHERITANCE: windows::Win32::Security::NO_INHERITANCE =
+            windows::Win32::Security::NO_INHERITANCE(0);
         const TRUSTEE_IS_NAME: windows::Win32::Security::Authorization::TRUSTEE_FORM =
             windows::Win32::Security::Authorization::TRUSTEE_FORM(1);
         const TRUSTEE_IS_USER: windows::Win32::Security::Authorization::TRUSTEE_TYPE =
@@ -84,7 +84,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             // Get current user name
             let mut name_buffer = [0u16; 256];
             let mut size = name_buffer.len() as u32;
-            if !GetUserNameW(PWSTR(name_buffer.as_mut_ptr()), &mut size) {
+            if !GetUserNameW(Some(PWSTR(name_buffer.as_mut_ptr())), &mut size) {
                 return Err(Error::Fs(format!(
                     "Failed to get current username: error code {}",
                     GetLastError().0
@@ -133,7 +133,7 @@ pub fn set_secure_permissions(path: &Path) -> Result<()> {
             );
 
             LocalFree(new_acl_ptr as isize);
-            if result != 0 {
+            if result != windows::Win32::Foundation::WIN32_ERROR(0) {
                 return Err(Error::Fs(format!(
                     "Failed to set file permissions: error code {:?}",
                     result
@@ -229,7 +229,7 @@ mod tests {
         use windows::core::PWSTR;
         use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
         // Use local constants defined as in set_secure_permissions
-        const DACL_SECURITY_INFORMATION: u32 =
+        const DACL_SECURITY_INFORMATION: windows::Win32::Security::OBJECT_SECURITY_INFORMATION =
             windows::Win32::Security::OBJECT_SECURITY_INFORMATION(0x00000004);
 
         // Create a temporary file
@@ -248,8 +248,8 @@ mod tests {
             let mut path_wide: Vec<u16> = path_str.encode_utf16().collect();
             path_wide.push(0); // Null terminate
 
-            let mut dacl_ptr: *mut _ = ptr::null_mut();
-            let mut security_descriptor: *mut _ = ptr::null_mut();
+            let mut dacl_ptr: *mut core::ffi::c_void = ptr::null_mut();
+            let mut security_descriptor: *mut core::ffi::c_void = ptr::null_mut();
 
             let result = GetNamedSecurityInfoW(
                 PWSTR(path_wide.as_mut_ptr()),
