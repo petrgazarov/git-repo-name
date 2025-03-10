@@ -316,7 +316,6 @@ mod sync_from_file_remote_tests {
         fixture.setup_remote(&remote_url)?;
 
         let output = fixture.run_sync(&remote_url, false)?;
-
         let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
 
         // The message has the pattern "Renaming directory from 'X' to 'Y'..."
@@ -405,14 +404,6 @@ mod sync_from_file_remote_tests {
                 #[cfg(unix)]
                 assert!(
                     msg.starts_with("Failed to resolve path: No such file or directory"),
-                    "Expected error about nonexistent path, got: {}",
-                    msg
-                );
-                #[cfg(windows)]
-                assert!(
-                    msg.starts_with(
-                        "Failed to resolve path: The system cannot find the path specified"
-                    ),
                     "Expected error about nonexistent path, got: {}",
                     msg
                 );
