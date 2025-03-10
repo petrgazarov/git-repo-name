@@ -1,0 +1,74 @@
+name: Release packages
+
+on:
+  release:
+    types:
+      - released
+
+permissions:
+  contents: read
+
+jobs:
+  update-homebrew:
+    name: Update Homebrew Tap
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout git-repo-name repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+          path: git-repo-name
+
+      - name: Checkout git-repo-name homebrew repo
+        uses: actions/checkout@v4
+        with:
+          repository: petrgazarov/homebrew-git-repo-name
+          path: homebrew-git-repo-name
+          token: ${{ secrets.HOMEBREW_GIT_REPO_NAME_GITHUB_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: echo "value=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Generate Homebrew Tap
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export VERSION="${{ steps.version.outputs.value }}"
+          gh release download --repo petrgazarov/git-repo-name "${VERSION}" -p 'git-repo-name*apple-darwin*' -p 'git-repo-name*linux-gnu*'
+
+          # Map for full Rust target triples
+          for i in \
+            "x86_64-apple-darwin   DARWIN_X64" \
+            "aarch64-apple-darwin  DARWIN_ARM64" \
+            "x86_64-unknown-linux-gnu   LINUX_X64" \
+            "aarch64-unknown-linux-gnu  LINUX_ARM64" \
+            ; do
+            set -- $i
+            RUST_TARGET="$1"
+            ENV_VAR="$2"
+            SHA256="$(sha256sum "git-repo-name-${VERSION}-${RUST_TARGET}" | cut -f1 -d' ')"
+            SHA256_VAR="${ENV_VAR}_SHA256"
+            URL_VAR="${ENV_VAR}_URL"
+            export "${SHA256_VAR}=${SHA256}"
+            export "${URL_VAR}=https://github.com/petrgazarov/git-repo-name/releases/download/${VERSION}/git-repo-name-${VERSION}-${RUST_TARGET}"
+          done
+
+          envsubst '$VERSION,$DARWIN_X64_URL,$DARWIN_X64_SHA256,$DARWIN_ARM64_URL,$DARWIN_ARM64_SHA256,$LINUX_X64_URL,$LINUX_X64_SHA256,$LINUX_ARM64_URL,$LINUX_ARM64_SHA256' < "./git-repo-name/.github/templates/git_repo_name_tap_template.rb" > ./homebrew-git-repo-name/git-repo-name.rb
+
+      - name: Commit and push updated formula
+        working-directory: homebrew-git-repo-name
+        run: |
+          set -euo pipefail
+
+          git config user.name petrgazarov
+          git config user.email petrgazarov@gmail.com
+          git add git-repo-name.rb
+          echo "::group::git diff"
+          git  --no-pager diff
+          echo "::endgroup::"
+
+          git commit -m "Brew formula update for git-repo-name version ${{ steps.version.outputs.value }}"
+          git push origin HEAD:main

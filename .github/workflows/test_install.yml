@@ -1,0 +1,67 @@
+name: Test Installation
+
+on:
+  workflow_run:
+    workflows: ["Release packages"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to test (e.g., 0.1.0). Leave empty to test latest release."
+        required: false
+        default: ""
+
+jobs:
+  test_install:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: git-repo-name-repo
+
+      - name: Get latest release tag
+        id: latest-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # If tag is provided via manual trigger, use that, otherwise fetch latest
+          if [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            LATEST_TAG="${{ github.event.inputs.tag }}"
+          else
+            LATEST_TAG=$(curl --silent "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name)
+          fi
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Install Homebrew (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+
+      - name: Install binary
+        if: startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'ubuntu')
+        run: |
+          brew tap petrgazarov/git-repo-name
+          brew install git-repo-name
+
+      - name: Verify basic functionality
+        shell: bash
+        run: |
+          # Create a test git repository
+          mkdir -p test-repo && cd test-repo
+          git init
+          git remote add origin git@github.com:petrgazarov/git-repo-name.git
+
+          # Run git-repo-name to see if it works
+          git-repo-name --help
+          git-repo-name fetch
