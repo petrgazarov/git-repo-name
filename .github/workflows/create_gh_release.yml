@@ -64,7 +64,7 @@ jobs:
       - name: Build binary
         shell: bash
         run: |
-          make build_release ARGS="--target ${{ matrix.rust_target }}"
+          make build_release CARGO_OPTS="--target ${{ matrix.rust_target }}"
 
           # Copy the binary to the root directory
           cp target/${{ matrix.rust_target }}/release/git-repo-name ${{ steps.get-binary-name.outputs.value }}
