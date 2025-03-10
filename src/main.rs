@@ -13,18 +13,18 @@ enum Commands {
     /// Fetch repository name from remote
     Fetch {
         /// Override the default remote
-        #[arg(long)]
+        #[arg(short = 'r', long)]
         remote: Option<String>,
     },
 
     /// Sync local directory name with remote repository name
     Sync {
-        /// Specify whether remote or local
+        /// Specify whether to use remote or local name as source of truth [default: remote]
         #[arg(short, long, value_enum, default_value_t = Source::Remote)]
         source: Source,
 
-        /// Override the default git remote
-        #[arg(long)]
+        /// Override the default git remote [default: origin]
+        #[arg(short = 'r', long)]
         remote: Option<String>,
 
         /// Print actions without executing them
