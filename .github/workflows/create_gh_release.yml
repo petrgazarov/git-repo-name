@@ -116,7 +116,7 @@ jobs:
           prerelease: ${{ contains(github.ref, '-rc') }}
           fail_on_unmatched_files: true
           files: |
-            git-repo-name-${{ env.VERSION }}-x86_64-apple-darwin
-            git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin
-            git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu
-            git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu
+            git-repo-name-${{ env.VERSION }}-x86_64-apple-darwin/git-repo-name-${{ env.VERSION }}-x86_64-apple-darwin
+            git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin/git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin
+            git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu/git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu
+            git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu/git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu
