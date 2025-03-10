@@ -28,31 +28,40 @@ jobs:
         with:
           path: git-repo-name-repo
 
-      - name: Get latest release tag
-        id: latest-tag
+      - name: Determine release tag
+        id: release-tag
         shell: bash
         run: |
           set -euo pipefail
 
           # If tag is provided via manual trigger, use that, otherwise fetch latest
           if [[ -n "${{ github.event.inputs.tag }}" ]]; then
-            LATEST_TAG="${{ github.event.inputs.tag }}"
+            RELEASE_TAG="${{ github.event.inputs.tag }}"
           else
-            LATEST_TAG=$(curl --silent "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name)
+            RELEASE_TAG=$(curl --silent "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name)
           fi
-          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
-      - name: Install Homebrew (Linux)
-        if: startsWith(matrix.os, 'ubuntu')
+      - name: Install Homebrew (Linux AMD64)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
 
-      - name: Install binary
-        if: startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'ubuntu')
+      - name: Install via Homebrew (MacOS and Linux AMD64)
+        if: matrix.os != 'ubuntu-24.04-arm'
         run: |
           brew tap petrgazarov/git-repo-name
           brew install git-repo-name
+
+      - name: Install binary directly (Linux ARM)
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          TAG="${{ steps.release-tag.outputs.tag }}"
+          # Download the ARM Linux binary
+          curl -L "https://github.com/${{ github.repository }}/releases/download/${TAG}/git-repo-name-${TAG}-aarch64-unknown-linux-gnu" -o git-repo-name
+          chmod +x git-repo-name
+          sudo mv git-repo-name /usr/local/bin/
 
       - name: Verify basic functionality
         shell: bash
