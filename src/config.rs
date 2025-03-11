@@ -1,4 +1,7 @@
-use crate::{Error, Result};
+use crate::{
+    types::{Error, Result},
+    utils,
+};
 use ini::Ini;
 use once_cell::sync::Lazy;
 use std::env;
@@ -130,7 +133,7 @@ impl Config {
         ini.write_to_file(&config_file)
             .map_err(|e| Error::Config(format!("Failed to write config file: {}", e)))?;
 
-        crate::fs::set_secure_permissions(&config_file)?;
+        utils::fs::set_secure_permissions(&config_file)?;
 
         Ok(())
     }

@@ -3,7 +3,7 @@ name = "git-repo-name"
 version = "0.1.2"
 edition = "2021"
 authors = ["Petr Gazarov"]
-description = "Sync git repository names between remote and local"
+description = "Sync repository name between your local git repo and remote"
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json", "blocking"] }

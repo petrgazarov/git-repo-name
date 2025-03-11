@@ -1,5 +1,9 @@
 use clap::{Parser, Subcommand};
-use git_repo_name::{config::CONFIG, fetch_repo_name, sync, Error, Result, Source};
+use git_repo_name::{
+    config::CONFIG,
+    fetch_repo_name, sync,
+    types::{Error, Result, Source},
+};
 
 #[derive(Parser)]
 #[command(author, version, about)]

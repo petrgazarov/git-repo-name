@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use crate::types::Error;
+use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use gag::BufferRedirect;
 use ini::Ini;
@@ -55,11 +57,11 @@ where
 {
     let mut captured = String::new();
     let result = {
-        let mut stdout = BufferRedirect::stdout().map_err(|e| crate::Error::Fs(e.to_string()))?;
+        let mut stdout = BufferRedirect::stdout().map_err(|e| Error::Fs(e.to_string()))?;
         let result = f()?;
         stdout
             .read_to_string(&mut captured)
-            .map_err(|e| crate::Error::Fs(e.to_string()))?;
+            .map_err(|e| Error::Fs(e.to_string()))?;
         result
     };
     Ok((captured, result))
@@ -142,6 +144,22 @@ pub fn normalize_for_test(path_str: &str) -> String {
         s
     };
     s.trim_end_matches('/').to_string()
+}
+
+/// Helper to check if directory exists or not
+pub fn assert_directory_existence(
+    temp: &TempDir,
+    name: &str,
+    should_exist: bool,
+) -> anyhow::Result<()> {
+    let check_path = temp.child(name);
+
+    if should_exist {
+        check_path.assert(predicates::path::exists());
+    } else {
+        check_path.assert(predicates::path::missing());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

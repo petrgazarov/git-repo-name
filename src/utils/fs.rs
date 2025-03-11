@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::types::{Error, Result};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;

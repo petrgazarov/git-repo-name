@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::types::{Error, Result};
 use git2::Repository;
 use std::path::Path;
 

@@ -1,12 +1,12 @@
-use crate::{config::CONFIG, fs, git, Error, Result};
+use crate::{
+    config::CONFIG,
+    git,
+    types::{Error, Result},
+    utils::fs,
+};
 use git2::Repository;
 use path_clean::PathClean;
 use std::path::Path;
-#[cfg(test)]
-#[path = "../test_helpers.rs"]
-mod test_helpers;
-#[cfg(test)]
-use test_helpers::normalize_for_test;
 
 pub fn sync_from_file_remote(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
     let local_directory_name = repo
@@ -130,14 +130,11 @@ mod tests {
 mod sync_from_file_remote_tests {
     use super::*;
     use crate::test_helpers;
-    use assert_fs::prelude::*;
-    use predicates::prelude::*;
 
     /// Test fixture to reduce repetition in tests
     struct SyncTestFixture {
         temp: assert_fs::TempDir,
         bare_repo_path: std::path::PathBuf,
-        repo_dir: std::path::PathBuf,
         repo: git2::Repository,
         canonical_remote_url: String,
         _guard: test_helpers::CurrentDirGuard,
@@ -160,7 +157,6 @@ mod sync_from_file_remote_tests {
             Ok(Self {
                 temp,
                 bare_repo_path,
-                repo_dir,
                 repo,
                 canonical_remote_url,
                 _guard: guard,
@@ -174,9 +170,7 @@ mod sync_from_file_remote_tests {
                 Ok(_) => {
                     self.repo.remote_delete("origin")?;
                 }
-                Err(_) => {
-                    // Remote doesn't exist, which is fine
-                }
+                Err(_) => {}
             }
             self.repo.remote("origin", remote_url)?;
             Ok(())
@@ -189,17 +183,6 @@ mod sync_from_file_remote_tests {
             })?;
 
             Ok(output)
-        }
-
-        // Helper to check if directory exists
-        fn assert_directory_exists(&self, name: &str, should_exist: bool) -> anyhow::Result<()> {
-            if should_exist {
-                assert!(self.repo_dir.exists());
-            } else {
-                assert!(!self.repo_dir.exists());
-                self.temp.child(name).assert(predicate::path::exists());
-            }
-            Ok(())
         }
 
         // Helper to check remote URL
@@ -225,7 +208,7 @@ mod sync_from_file_remote_tests {
         );
 
         fixture.assert_remote_url(&remote_url)?;
-        fixture.assert_directory_exists("same-repo", true)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "same-repo", true)?;
 
         Ok(())
     }
@@ -239,7 +222,7 @@ mod sync_from_file_remote_tests {
         fixture.run_sync(&remote_url, false)?;
 
         fixture.assert_remote_url(&remote_url)?;
-        fixture.assert_directory_exists("same-repo", true)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "same-repo", true)?;
 
         Ok(())
     }
@@ -275,7 +258,7 @@ mod sync_from_file_remote_tests {
         fixture.run_sync(relative_remote_url, false)?;
 
         fixture.assert_remote_url(&fixture.canonical_remote_url)?;
-        fixture.assert_directory_exists("test-repo", true)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "test-repo", true)?;
 
         Ok(())
     }
@@ -291,9 +274,11 @@ mod sync_from_file_remote_tests {
 
         // The message has the pattern "Would rename directory from 'X' to 'Y'"
         // We'll check if it's present in the output with flexible matching
-        let normalized_output = normalize_for_test(&output);
-        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+        let normalized_output = test_helpers::normalize_for_test(&output);
+        let old_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
 
         assert!(
             normalized_output.contains("Would rename directory from '")
@@ -304,7 +289,7 @@ mod sync_from_file_remote_tests {
             output
         );
 
-        fixture.assert_directory_exists("old-name", true)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "old-name", true)?;
 
         Ok(())
     }
@@ -320,9 +305,11 @@ mod sync_from_file_remote_tests {
 
         // The message has the pattern "Renaming directory from 'X' to 'Y'..."
         // We'll check if it's present in the output with more flexible matching
-        let normalized_output = normalize_for_test(&output);
-        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+        let normalized_output = test_helpers::normalize_for_test(&output);
+        let old_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
 
         assert!(
             normalized_output.contains("Renaming directory from '")
@@ -333,7 +320,8 @@ mod sync_from_file_remote_tests {
             output
         );
 
-        fixture.assert_directory_exists("new-name", false)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "old-name", false)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "new-name", true)?;
 
         Ok(())
     }
@@ -349,18 +337,22 @@ mod sync_from_file_remote_tests {
 
         // Add back the directory rename assertion
         assert!(
-            normalize_for_test(&output).contains(&normalize_for_test(&format!(
-                "Would change 'origin' remote from '{}' to '{}'",
-                relative_remote_url, fixture.canonical_remote_url
-            ))),
+            test_helpers::normalize_for_test(&output).contains(&test_helpers::normalize_for_test(
+                &format!(
+                    "Would change 'origin' remote from '{}' to '{}'",
+                    relative_remote_url, fixture.canonical_remote_url
+                )
+            )),
             "Expected remote URL update message, got: {}",
             output
         );
 
         // Now check for directory rename message - more flexible matching
-        let normalized_output = normalize_for_test(&output);
-        let old_pattern = normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern = normalize_for_test(&parent_dir.join("new-name").display().to_string());
+        let normalized_output = test_helpers::normalize_for_test(&output);
+        let old_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
+        let new_pattern =
+            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
 
         assert!(
             normalized_output.contains("Would rename directory from '")
@@ -372,7 +364,7 @@ mod sync_from_file_remote_tests {
         );
 
         fixture.assert_remote_url(relative_remote_url)?;
-        fixture.assert_directory_exists("old-name", true)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "old-name", true)?;
 
         Ok(())
     }
@@ -386,7 +378,8 @@ mod sync_from_file_remote_tests {
         fixture.run_sync(relative_remote_url, false)?;
 
         fixture.assert_remote_url(&fixture.canonical_remote_url)?;
-        fixture.assert_directory_exists("new-name", false)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "old-name", false)?;
+        test_helpers::assert_directory_existence(&fixture.temp, "new-name", true)?;
 
         Ok(())
     }
