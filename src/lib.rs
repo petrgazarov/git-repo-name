@@ -12,27 +12,27 @@ pub mod remotes {
 pub(crate) mod test_helpers;
 use crate::{
     remotes::{file, github},
-    types::{Result, Source},
+    types::Result,
 };
 use std::path::Path;
 
-pub fn sync(source: Source, dry_run: bool) -> Result<()> {
+pub fn pull(dry_run: bool) -> Result<()> {
     let repo = git::get_current_repo()?;
     let remote_url = git::get_remote_url(&repo)?;
 
-    match source {
-        Source::Remote => {
-            if github::is_github_url(&remote_url) {
-                github::sync_from_github_remote(&repo, &remote_url, dry_run)
-            } else {
-                file::sync_from_file_remote(&repo, &remote_url, dry_run)
-            }
-        }
-        Source::Local => {
-            println!("TODO: Implement local source sync");
-            Ok(())
-        }
+    if github::is_github_url(&remote_url) {
+        github::sync_from_github_remote(&repo, &remote_url, dry_run)
+    } else {
+        file::sync_from_file_remote(&repo, &remote_url, dry_run)
     }
+}
+
+pub fn push(_dry_run: bool) -> Result<()> {
+    let repo = git::get_current_repo()?;
+    let _remote_url = git::get_remote_url(&repo)?;
+
+    println!("TODO: Implement push");
+    Ok(())
 }
 
 pub fn fetch_repo_name() -> Result<String> {

@@ -7,26 +7,21 @@
 `git-repo-name` provides three main commands:
 
 ```sh
-git repo-name sync    # Sync local directory name with remote repository name
+git repo-name pull    # Pull repository name from remote and update local directory name
+git repo-name push    # Update remote repository name with local directory name
 git repo-name fetch   # Fetch repository name from remote without making changes
 git repo-name config  # Configure settings for git-repo-name
 ```
 
-### Sync
+### Pull
 
-Syncs the name between your local directory and remote repository based on the specified source of truth.
+Updates the local directory name with the repository name from the remote.
 
 ```sh
-git repo-name sync [OPTIONS]
+git repo-name pull [OPTIONS]
 ```
 
 #### Options
-
-- `-s, --source <SOURCE>`: Specify the source of truth for the name sync [default: remote]
-
-  - Possible values: `remote`, `local`
-  - When set to `remote`, the local directory will be renamed to match the remote repository name
-  - [WIP] When set to `local`, the remote will be renamed to match the local directory name
 
 - `-r, --remote <REMOTE>`: Override the default git remote [default: origin]
 
@@ -37,20 +32,49 @@ git repo-name sync [OPTIONS]
 **Examples:**
 
 ```bash
-# Use remote name as source of truth (default behavior)
-git repo-name sync
-
-# Use local directory name as source of truth instead
-git repo-name sync -s local
+# Basic usage
+git repo-name pull
 
 # Use a different remote than origin
-git repo-name sync -r upstream
+git repo-name pull -r upstream
 
 # Preview what would happen without making changes
-git repo-name sync -n
+git repo-name pull -n
 
 # Combine multiple options
-git repo-name sync -s local -r upstream -n
+git repo-name pull -r upstream -n
+```
+
+### Push
+
+Updates the remote repository name with the local directory name.
+
+```sh
+git repo-name push [OPTIONS]
+```
+
+#### Options
+
+- `-r, --remote <REMOTE>`: Override the default git remote [default: origin]
+
+  - Use this to specify a different remote if your repository has multiple remotes
+
+- `-n, --dry-run`: Print actions without executing them
+
+**Examples:**
+
+```bash
+# Basic usage
+git repo-name push
+
+# Use a different remote than origin
+git repo-name push -r upstream
+
+# Preview what would happen without making changes
+git repo-name push -n
+
+# Combine multiple options
+git repo-name push -r upstream -n
 ```
 
 ### Fetch

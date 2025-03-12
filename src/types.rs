@@ -26,25 +26,3 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-/// Represents the source of truth for the repository name
-#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
-pub enum Source {
-    Remote,
-    Local,
-}
-
-impl TryFrom<&str> for Source {
-    type Error = Error;
-
-    fn try_from(s: &str) -> Result<Self> {
-        match s {
-            "remote" => Ok(Source::Remote),
-            "local" => Ok(Source::Local),
-            _ => Err(Error::Config(format!(
-                "Invalid source value: '{}'. Valid values are 'remote' or 'local'",
-                s
-            ))),
-        }
-    }
-}

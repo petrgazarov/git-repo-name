@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use git_repo_name::{
     config::CONFIG,
-    fetch_repo_name, sync,
-    types::{Error, Result, Source},
+    fetch_repo_name, pull, push,
+    types::{Error, Result},
 };
 
 #[derive(Parser)]
@@ -14,34 +14,30 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Fetch repository name from remote
     Fetch {
-        /// Override the default remote
         #[arg(short = 'r', long)]
         remote: Option<String>,
     },
 
-    /// Sync local directory name with remote repository name
-    Sync {
-        /// Specify whether to use remote or local name as source of truth [default: remote]
-        #[arg(short, long, value_enum, default_value_t = Source::Remote)]
-        source: Source,
-
-        /// Override the default git remote [default: origin]
+    Pull {
         #[arg(short = 'r', long)]
         remote: Option<String>,
 
-        /// Print actions without executing them
         #[arg(short = 'n', long)]
         dry_run: bool,
     },
 
-    /// Configure settings
+    Push {
+        #[arg(short = 'r', long)]
+        remote: Option<String>,
+
+        #[arg(short = 'n', long)]
+        dry_run: bool,
+    },
+
     Config {
-        /// Configuration key
         key: String,
 
-        /// Configuration value (optional for getters)
         value: Option<String>,
     },
 }
@@ -57,15 +53,17 @@ fn run() -> Result<()> {
             fetch_repo_name()?;
             Ok(())
         }
-        Commands::Sync {
-            source,
-            dry_run,
-            remote,
-        } => {
+        Commands::Pull { remote, dry_run } => {
             if let Some(remote_name) = remote {
                 CONFIG.set_remote(remote_name);
             }
-            sync(source, dry_run)
+            pull(dry_run)
+        }
+        Commands::Push { remote, dry_run } => {
+            if let Some(remote_name) = remote {
+                CONFIG.set_remote(remote_name);
+            }
+            push(dry_run)
         }
         Commands::Config { key, value } => match key.as_str() {
             "github-token" => match value {
