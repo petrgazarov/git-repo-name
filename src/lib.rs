@@ -11,7 +11,6 @@ pub mod remotes {
 #[cfg(test)]
 pub(crate) mod test_helpers;
 use crate::{
-    config::CONFIG,
     remotes::{file, github},
     types::{Result, Source},
 };
@@ -19,8 +18,7 @@ use std::path::Path;
 
 pub fn sync(source: Source, dry_run: bool) -> Result<()> {
     let repo = git::get_current_repo()?;
-    let remote = CONFIG.get_remote()?;
-    let remote_url = git::get_remote_url(&repo, &remote)?;
+    let remote_url = git::get_remote_url(&repo)?;
 
     match source {
         Source::Remote => {
@@ -39,8 +37,7 @@ pub fn sync(source: Source, dry_run: bool) -> Result<()> {
 
 pub fn fetch_repo_name() -> Result<String> {
     let repo = git::get_current_repo()?;
-    let remote = CONFIG.get_remote()?;
-    let remote_url = git::get_remote_url(&repo, &remote)?;
+    let remote_url = git::get_remote_url(&repo)?;
     let result;
 
     if github::is_github_url(&remote_url) {

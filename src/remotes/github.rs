@@ -138,19 +138,7 @@ pub fn sync_from_github_remote(repo: &Repository, remote_url: &str, dry_run: boo
     }
 
     if should_change_remote {
-        let remote = CONFIG.get_remote()?;
-        if dry_run {
-            println!(
-                "Would change '{}' remote from '{}' to '{}'",
-                remote, remote_url, resolved_remote_url
-            );
-        } else {
-            println!(
-                "Changing '{}' remote from '{}' to '{}'",
-                remote, remote_url, resolved_remote_url
-            );
-            git::set_remote_url(repo, &remote, &resolved_remote_url)?;
-        }
+        git::set_remote_url(repo, remote_url, &resolved_remote_url, dry_run)?;
     }
 
     if should_rename_directory {
@@ -345,21 +333,6 @@ mod sync_from_github_remote_tests {
             })
         }
 
-        // Set up the remote with the given URL
-        fn setup_remote(&self, remote_url: &str) -> anyhow::Result<()> {
-            // Remove the remote if it exists
-            match self.repo.find_remote("origin") {
-                Ok(_) => {
-                    self.repo.remote_delete("origin")?;
-                }
-                Err(_) => {
-                    // Remote doesn't exist, which is fine
-                }
-            }
-            self.repo.remote("origin", remote_url)?;
-            Ok(())
-        }
-
         // Run the sync operation and return the output
         fn run_sync(&self, remote_url: &str, dry_run: bool) -> anyhow::Result<String> {
             let (output, _) = test_helpers::capture_stdout(|| {
@@ -370,7 +343,7 @@ mod sync_from_github_remote_tests {
 
         // Helper to check remote URL
         fn assert_remote_url(&self, expected_url: &str) -> anyhow::Result<()> {
-            let remote_url = git::get_remote_url(&self.repo, &CONFIG.get_remote()?)?;
+            let remote_url = git::get_remote_url(&self.repo)?;
             assert_eq!(remote_url, expected_url);
             Ok(())
         }
@@ -401,7 +374,7 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("owner", "owner", "test-repo", "test-repo");
 
         // Set up the remote
-        fixture.setup_remote(remote_url)?;
+        fixture.repo.remote("origin", remote_url)?;
 
         // Run sync in dry run mode
         let output = fixture.run_sync(remote_url, true)?;
@@ -429,7 +402,7 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("owner", "owner", "test-repo", "test-repo");
 
         // Set up the remote
-        fixture.setup_remote(remote_url)?;
+        fixture.repo.remote("origin", remote_url)?;
 
         // Run sync
         let output = fixture.run_sync(remote_url, false)?;
@@ -458,7 +431,7 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("old-owner", "new-owner", "repo-name", "repo-name");
 
         // Set up the remote
-        fixture.setup_remote(old_url)?;
+        fixture.repo.remote("origin", old_url)?;
 
         // Run sync in dry run mode
         let output = fixture.run_sync(old_url, true)?;
@@ -490,7 +463,7 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("old-owner", "new-owner", "repo-name", "repo-name");
 
         // Set up the remote with SSH URL
-        fixture.setup_remote(old_url)?;
+        fixture.repo.remote("origin", old_url)?;
 
         // Run sync
         let output = fixture.run_sync(old_url, false)?;
@@ -521,25 +494,20 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("owner", "owner", "new-name", "new-name");
 
         // Set up the remote
-        fixture.setup_remote(remote_url)?;
+        fixture.repo.remote("origin", remote_url)?;
 
         // Run sync in dry run mode
         let output = fixture.run_sync(remote_url, true)?;
 
-        // The message has the pattern "Would rename directory from 'X' to 'Y'"
-        // We'll check if it's present in the output with more flexible matching
-        let normalized_output = test_helpers::normalize_for_test(&output);
         let parent_dir = fixture.repo_dir.parent().unwrap().canonicalize()?;
-        let old_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
 
+        // Verify output shows directory would be renamed
         assert!(
-            normalized_output.contains("Would rename directory from '")
-                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
+            output.contains(&format!(
+                "Would rename directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
             "Expected directory rename message, got: {}",
             output
         );
@@ -560,26 +528,20 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("owner", "owner", "new-name", "new-name");
 
         // Set up the remote
-        fixture.setup_remote(remote_url)?;
+        fixture.repo.remote("origin", remote_url)?;
 
         // Run sync
         let output = fixture.run_sync(remote_url, false)?;
 
         let parent_dir = fixture.repo_dir.parent().unwrap().canonicalize()?;
 
-        // The message has the pattern "Renaming directory from 'X' to 'Y'..."
-        // We'll check if it's present in the output with more flexible matching
-        let normalized_output = test_helpers::normalize_for_test(&output);
-        let old_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
-
+        // Verify output shows directory was renamed
         assert!(
-            normalized_output.contains("Renaming directory from '")
-                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
+            output.contains(&format!(
+                "Renaming directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
             "Expected directory rename message, got: {}",
             output
         );
@@ -602,38 +564,28 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("old-owner", "new-owner", "old-name", "new-name");
 
         // Set up the remote with SSH URL
-        fixture.setup_remote(old_url)?;
+        fixture.repo.remote("origin", old_url)?;
 
         // Run sync in dry run mode
         let output = fixture.run_sync(old_url, true)?;
 
-        // We'll check if the message patterns are present with more flexible matching
-        let normalized_output = test_helpers::normalize_for_test(&output);
+        let parent_dir = fixture.repo_dir.parent().unwrap().canonicalize()?;
 
-        // First check remote URL update message
+        // Verify output shows both changes would be made
         assert!(
-            normalized_output.contains("Would change 'origin' remote from '")
-                && normalized_output.contains(&test_helpers::normalize_for_test(old_url))
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(&test_helpers::normalize_for_test(&expected_new_url)),
+            output.contains(&format!(
+                "Would change 'origin' remote from '{}' to '{}'",
+                old_url, expected_new_url
+            )),
             "Expected remote URL update message, got: {}",
             output
         );
-
-        // Get parent directory and define expected paths
-        let parent_dir = fixture.repo_dir.parent().unwrap().canonicalize()?;
-        let expected_old = parent_dir.join("old-name").display().to_string();
-        let expected_new = parent_dir.join("new-name").display().to_string();
-
         assert!(
-            normalized_output.contains("Would rename directory from '")
-                && normalized_output.contains(
-                    &test_helpers::normalize_for_test(&expected_old).trim_end_matches('/')
-                )
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(
-                    &test_helpers::normalize_for_test(&expected_new).trim_end_matches('/')
-                ),
+            output.contains(&format!(
+                "Would rename directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
             "Expected directory rename message, got: {}",
             output
         );
@@ -656,36 +608,28 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_repo("old-owner", "new-owner", "old-name", "new-name");
 
         // Set up the remote with SSH URL
-        fixture.setup_remote(old_url)?;
+        fixture.repo.remote("origin", old_url)?;
 
         // Run sync
         let output = fixture.run_sync(old_url, false)?;
 
         let parent_dir = fixture.repo_dir.parent().unwrap().canonicalize()?;
 
-        // Verify output shows URL change
-        let normalized_output = test_helpers::normalize_for_test(&output);
-
+        // Verify output shows both changes were made
         assert!(
-            normalized_output.contains("Changing 'origin' remote from '")
-                && normalized_output.contains(&test_helpers::normalize_for_test(old_url))
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(&test_helpers::normalize_for_test(&expected_new_url)),
+            output.contains(&format!(
+                "Changing 'origin' remote from '{}' to '{}'",
+                old_url, expected_new_url
+            )),
             "Expected remote URL update message, got: {}",
             output
         );
-
-        // Verify output shows directory rename
-        let old_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("old-name").display().to_string());
-        let new_pattern =
-            test_helpers::normalize_for_test(&parent_dir.join("new-name").display().to_string());
-
         assert!(
-            normalized_output.contains("Renaming directory from '")
-                && normalized_output.contains(&old_pattern.trim_end_matches('/'))
-                && normalized_output.contains("' to '")
-                && normalized_output.contains(&new_pattern.trim_end_matches('/')),
+            output.contains(&format!(
+                "Renaming directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
             "Expected directory rename message, got: {}",
             output
         );
@@ -734,11 +678,13 @@ mod sync_from_github_remote_tests {
             fixture.mock_github_repo("owner", "owner", "test-repo", "test-repo");
 
             // Set up the remote
-            fixture.setup_remote(url)?;
+            fixture.repo.remote("origin", url)?;
 
             // Run sync
             let result = fixture.run_sync(url, false);
             assert!(result.is_ok(), "Failed with URL format: {}", url);
+
+            fixture.repo.remote_delete("origin")?;
         }
 
         Ok(())
@@ -753,7 +699,7 @@ mod sync_from_github_remote_tests {
         fixture.mock_github_error("owner", "test-repo", 404);
 
         // Set up the remote
-        fixture.setup_remote(remote_url)?;
+        fixture.repo.remote("origin", remote_url)?;
 
         let result = fixture.run_sync(remote_url, false);
 

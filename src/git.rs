@@ -1,4 +1,7 @@
-use crate::types::{Error, Result};
+use crate::{
+    config::CONFIG,
+    types::{Error, Result},
+};
 use git2::Repository;
 use std::path::Path;
 
@@ -6,22 +9,45 @@ pub fn get_current_repo() -> Result<Repository> {
     Repository::discover(".").map_err(|_| Error::NotAGitRepo)
 }
 
-pub fn get_remote_url(repo: &Repository, remote_name: &str) -> Result<String> {
+pub fn get_remote_url(repo: &Repository) -> Result<String> {
+    let remote_name = CONFIG.get_remote()?;
+
     let remote = repo
-        .find_remote(remote_name)
-        .map_err(|_| Error::NoRemote(remote_name.to_string()))?;
+        .find_remote(&remote_name)
+        .map_err(|_| Error::NoRemote(remote_name.clone()))?;
 
     let url = remote
         .url()
-        .ok_or_else(|| Error::NoRemote(remote_name.to_string()))?
+        .ok_or_else(|| Error::NoRemote(remote_name.clone()))?
         .to_string();
 
     Ok(url)
 }
 
-pub fn set_remote_url(repo: &Repository, remote_name: &str, url: &str) -> Result<()> {
-    repo.remote_set_url(remote_name, url)
-        .map_err(|e| Error::Other(e.into()))
+pub fn set_remote_url(
+    repo: &Repository,
+    current_url: &str,
+    new_url: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let remote_name = CONFIG.get_remote()?;
+
+    if dry_run {
+        println!(
+            "Would change '{}' remote from '{}' to '{}'",
+            remote_name, current_url, new_url
+        );
+    } else {
+        println!(
+            "Changing '{}' remote from '{}' to '{}'",
+            remote_name, current_url, new_url
+        );
+
+        repo.remote_set_url(&remote_name, new_url)
+            .map_err(|e| Error::Other(e.into()))?;
+    }
+
+    Ok(())
 }
 
 pub fn extract_repo_name_from_path(url: &str) -> Result<String> {

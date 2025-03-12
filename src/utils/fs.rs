@@ -10,9 +10,12 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
         .ok_or_else(|| Error::Fs("Cannot get parent directory".into()))?;
     let new_path = parent_path.join(new_name);
 
-    // Use native path display for user output
-    let current_display = current_path.display().to_string();
-    let new_display = new_path.display().to_string();
+    // Convert paths to strings and remove any trailing slashes for display
+    let current_display = current_path
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
+    let new_display = new_path.to_string_lossy().trim_end_matches('/').to_string();
 
     if dry_run {
         println!(
