@@ -5,8 +5,15 @@ pub mod utils {
     pub mod fs;
 }
 pub mod remotes {
-    pub mod file;
-    pub mod github;
+    pub mod file {
+        pub mod operations;
+        pub mod url;
+    }
+    pub mod github {
+        pub mod client;
+        pub mod operations;
+        pub mod url;
+    }
 }
 #[cfg(test)]
 pub(crate) mod test_helpers;
@@ -20,19 +27,22 @@ pub fn pull(dry_run: bool) -> Result<()> {
     let repo = git::get_current_repo()?;
     let remote_url = git::get_remote_url(&repo)?;
 
-    if github::is_github_url(&remote_url) {
-        github::sync_from_github_remote(&repo, &remote_url, dry_run)
+    if github::url::is_github_url(&remote_url) {
+        github::operations::pull_from_github_remote(&repo, &remote_url, dry_run)
     } else {
-        file::sync_from_file_remote(&repo, &remote_url, dry_run)
+        file::operations::pull_from_file_remote(&repo, &remote_url, dry_run)
     }
 }
 
-pub fn push(_dry_run: bool) -> Result<()> {
+pub fn push(dry_run: bool) -> Result<()> {
     let repo = git::get_current_repo()?;
-    let _remote_url = git::get_remote_url(&repo)?;
+    let remote_url = git::get_remote_url(&repo)?;
 
-    println!("TODO: Implement push");
-    Ok(())
+    if github::url::is_github_url(&remote_url) {
+        github::operations::push_to_github_remote(&repo, &remote_url, dry_run)
+    } else {
+        file::operations::push_to_file_remote(&repo, &remote_url, dry_run)
+    }
 }
 
 pub fn fetch_repo_name() -> Result<String> {
@@ -40,9 +50,9 @@ pub fn fetch_repo_name() -> Result<String> {
     let remote_url = git::get_remote_url(&repo)?;
     let result;
 
-    if github::is_github_url(&remote_url) {
-        let (owner, repo_name) = github::parse_github_url(&remote_url)?;
-        let repo_info = github::get_repo_info(&owner, &repo_name)?;
+    if github::url::is_github_url(&remote_url) {
+        let (owner, repo_name) = github::url::parse_github_url(&remote_url)?;
+        let repo_info = github::client::get_repo_info(&owner, &repo_name)?;
         result = format!("{} ({})", repo_info.name, repo_info.clone_url);
     } else {
         let canonical_path = utils::fs::resolve_canonical_path(Path::new(&remote_url))?;

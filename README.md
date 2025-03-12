@@ -118,7 +118,7 @@ git repo-name config <KEY> [VALUE]
 - `github-token`: GitHub personal access token for accessing private repositories and modifying repositories
 
   - **When it's needed**:
-    - Required when working with private repositories or when using `sync -s local`.
+    - Required when working with private repositories or when using `push` command.
   - **Best practice**: Use [GitHub's Fine-grained personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) with:
     - **Metadata permission (read)**: To fetch private repository names and URLs
     - **Administration permission (write)**: To rename repositories on GitHub
