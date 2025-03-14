@@ -95,14 +95,12 @@ mod tests {
     fn test_rename_directory_errors() {
         let temp = assert_fs::TempDir::new().unwrap();
 
-        // Test invalid source path
         let non_existent = temp.child("non_existent");
         assert!(matches!(
             rename_directory(non_existent.path(), "new_name", false),
             Err(Error::Fs(_))
         ));
 
-        // Test renaming to existing directory
         let existing = temp.child("existing");
         existing.create_dir_all().unwrap();
         let source = temp.child("source");
@@ -135,12 +133,10 @@ mod tests {
         let real_dir = temp.child("real_dir");
         real_dir.create_dir_all()?;
 
-        // Test regular path
         let resolved = resolve_canonical_path(real_dir.path())?;
         let expected = format!("file://{}", real_dir.path().canonicalize()?.display());
         assert_eq!(resolved, expected);
 
-        // Test file:// URL
         let file_url = format!("file://{}", real_dir.path().display());
         let resolved_url = resolve_canonical_path(Path::new(&file_url))?;
         assert_eq!(resolved_url, expected);

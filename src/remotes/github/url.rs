@@ -86,7 +86,6 @@ mod tests {
         assert!(is_github_url("ssh://git@github.com/owner/repo"));
         assert!(is_github_url("git://github.com/owner/repo.git"));
         assert!(is_github_url("git://github.com/owner/repo"));
-
         // Invalid URLs
         assert!(!is_github_url("https://gitlab.com/owner/repo.git"));
         assert!(!is_github_url("git@gitlab.com:owner/repo.git"));

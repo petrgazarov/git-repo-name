@@ -87,13 +87,9 @@ mod tests {
         let original_dir = std::env::current_dir()?;
         for url in test_urls {
             let (main_repo_dir, repo) = test_helpers::create_main_repo(&temp, "main-repo")?;
-
-            // Needed for relative path test case to work
             std::env::set_current_dir(&main_repo_dir)?;
-
             repo.remote("origin", url)?;
 
-            // Canonicalized file URL
             let expected_url = format!(
                 "file://{}",
                 temp.path()
@@ -143,7 +139,6 @@ mod tests {
             std::fs::remove_dir_all(&main_repo_dir)?;
         }
 
-        // Clean up
         std::env::set_current_dir(&original_dir)?;
         std::env::remove_var("GITHUB_API_BASE_URL");
 

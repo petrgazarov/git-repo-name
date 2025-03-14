@@ -51,10 +51,8 @@ pub fn set_remote_url(
 }
 
 pub fn extract_repo_name_from_path(url: &str) -> Result<String> {
-    // Remove .git suffix if present
     let url = url.strip_suffix(".git").unwrap_or(url);
 
-    // Get the last component of the path
     let name = Path::new(url)
         .file_name()
         .and_then(|n| n.to_str())
@@ -93,7 +91,6 @@ mod tests {
             ("/path/to/repo", "repo"),
             ("repo.git", "repo"),
             ("repo", "repo"),
-            // Test with file:// URLs
             ("file:///path/to/repo.git", "repo"),
             ("file:///path/to/repo", "repo"),
         ];
