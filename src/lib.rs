@@ -117,7 +117,7 @@ mod tests {
     fn test_fetch_repo_name_github() -> anyhow::Result<()> {
         let temp = assert_fs::TempDir::new()?;
         test_helpers::setup_test_config(temp.path())?;
-        test_helpers::mock_github_repo("owner", "owner", "test-repo", "upstream-repo");
+        test_helpers::mock_github_get_repo("owner", "owner", "test-repo", "upstream-repo");
 
         let test_urls = [
             "https://github.com/owner/test-repo.git",

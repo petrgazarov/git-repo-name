@@ -87,7 +87,7 @@ impl Drop for CurrentDirGuard {
 }
 
 /// Mock GitHub API response for a repository.
-pub fn mock_github_repo(
+pub fn mock_github_get_repo(
     old_owner: &str,
     new_owner: &str,
     old_repo_name: &str,
@@ -118,15 +118,70 @@ pub fn mock_github_repo(
 }
 
 /// Mock GitHub API error response.
-pub fn mock_github_error(owner: &str, repo: &str, status: usize) {
+pub fn mock_github_get_repo_error(owner: &str, repo: &str) {
     let mut server = mockito::Server::new();
     std::env::set_var("GITHUB_API_BASE_URL", server.url());
 
     let _mock = server
         .mock("GET", format!("/repos/{}/{}", owner, repo).as_str())
-        .with_status(status)
+        .with_status(404)
         .with_header("content-type", "application/json")
         .with_body(r#"{"message": "Not Found"}"#)
+        .create();
+
+    // Server will be kept alive until it goes out of scope at the end of the test
+    std::mem::forget(server);
+}
+
+/// Mock GitHub API repository update response.
+pub fn mock_github_update_repo(
+    old_owner: &str,
+    new_owner: &str,
+    old_repo_name: &str,
+    new_repo_name: &str,
+) {
+    let mut server = mockito::Server::new();
+    std::env::set_var("GITHUB_API_BASE_URL", server.url());
+
+    let response_body = serde_json::json!({
+        "name": new_repo_name,
+        "full_name": format!("{}/{}", new_owner, new_repo_name),
+        "clone_url": format!("https://github.com/{}/{}.git", new_owner, new_repo_name)
+    });
+
+    let _mock = server
+        .mock(
+            "PATCH",
+            format!("/repos/{}/{}", old_owner, old_repo_name).as_str(),
+        )
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(response_body.to_string())
+        .create();
+
+    // Server will be kept alive until it goes out of scope at the end of the test
+    std::mem::forget(server);
+}
+
+/// Mock GitHub API error response for PATCH requests (used for repository updates).
+pub fn mock_github_update_repo_error(owner: &str, repo: &str, status: usize) {
+    let mut server = mockito::Server::new();
+    std::env::set_var("GITHUB_API_BASE_URL", server.url());
+
+    let error_message = match status {
+        403 => {
+            r#"{"message": "Permission denied. Ensure your GitHub token has the 'repo' scope."}"#
+        }
+        404 => r#"{"message": "Not Found"}"#,
+        422 => r#"{"message": "Repository name is already taken"}"#,
+        _ => r#"{"message": "Failed to update repository name"}"#,
+    };
+
+    let _mock = server
+        .mock("PATCH", format!("/repos/{}/{}", owner, repo).as_str())
+        .with_status(status)
+        .with_header("content-type", "application/json")
+        .with_body(error_message)
         .create();
 
     // Server will be kept alive until it goes out of scope at the end of the test

@@ -67,9 +67,24 @@ pub fn extract_repo_name_from_path(url: &str) -> Result<String> {
     Ok(name.to_string())
 }
 
+pub fn get_local_directory_name(repo: &Repository) -> Result<String> {
+    let local_directory_name = repo
+        .workdir()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .file_name()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .to_str()
+        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
+        .to_string();
+
+    Ok(local_directory_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers;
+    use assert_fs::TempDir;
 
     #[test]
     fn test_extract_repo_name_from_path() {
@@ -86,5 +101,18 @@ mod tests {
         for (url, expected) in test_cases {
             assert_eq!(extract_repo_name_from_path(url).unwrap(), expected);
         }
+    }
+
+    #[test]
+    fn test_get_local_directory_name() -> anyhow::Result<()> {
+        let temp = TempDir::new()?;
+
+        let repo_name = "test-repo";
+        let (_repo_path, repo) = test_helpers::create_main_repo(&temp, repo_name)?;
+        let dir_name = get_local_directory_name(&repo).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        assert_eq!(dir_name, repo_name);
+
+        Ok(())
     }
 }

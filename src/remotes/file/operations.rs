@@ -8,14 +8,7 @@ use git2::Repository;
 use std::path::Path;
 
 pub fn pull_from_file_remote(repo: &Repository, remote_url: &str, dry_run: bool) -> Result<()> {
-    let local_directory_name = repo
-        .workdir()
-        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
-        .file_name()
-        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
-        .to_str()
-        .ok_or_else(|| Error::Fs("Cannot get repository working directory".into()))?
-        .to_string();
+    let local_directory_name = git::get_local_directory_name(repo)?;
     let canonical_path = fs::resolve_canonical_path(Path::new(&remote_url))?;
     let resolved_repo_name = git::extract_repo_name_from_path(&canonical_path)?;
 

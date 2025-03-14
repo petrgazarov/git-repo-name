@@ -6,6 +6,7 @@ use reqwest::blocking::Client as ReqwestClient;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
 use reqwest::StatusCode;
 use serde::Deserialize;
+use serde_json::json;
 
 #[derive(Debug, Deserialize)]
 pub struct GitHubRepo {
@@ -14,11 +15,16 @@ pub struct GitHubRepo {
     pub clone_url: String,
 }
 
-pub fn create_client(token: Option<&str>) -> Result<ReqwestClient> {
+pub fn get_base_url() -> String {
+    std::env::var("GITHUB_API_BASE_URL").unwrap_or_else(|_| "https://api.github.com".to_string())
+}
+
+pub fn create_client() -> Result<ReqwestClient> {
     let mut headers = HeaderMap::new();
+    let auth_token = CONFIG.get_github_token().ok();
 
     // Add authorization header only if token is provided
-    if let Some(token_str) = token {
+    if let Some(token_str) = auth_token {
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&format!("token {}", token_str))
@@ -35,12 +41,8 @@ pub fn create_client(token: Option<&str>) -> Result<ReqwestClient> {
 }
 
 pub fn get_repo_info(owner: &str, repo: &str) -> Result<GitHubRepo> {
-    let base_url = std::env::var("GITHUB_API_BASE_URL")
-        .unwrap_or_else(|_| "https://api.github.com".to_string());
-    let url = format!("{}/repos/{}/{}", base_url, owner, repo);
-
-    let token = CONFIG.get_github_token().ok();
-    let client = create_client(token.as_deref())?;
+    let url = format!("{}/repos/{}/{}", get_base_url(), owner, repo);
+    let client = create_client()?;
     let response = client.get(&url).send();
 
     match response {
@@ -58,6 +60,32 @@ pub fn get_repo_info(owner: &str, repo: &str) -> Result<GitHubRepo> {
                 }
             }
         }
+        Err(e) => Err(Error::GitHubApi(e.to_string())),
+    }
+}
+
+pub fn update_repo_name(owner: &str, repo: &str, new_name: &str) -> Result<GitHubRepo> {
+    let url = format!("{}/repos/{}/{}", get_base_url(), owner, repo);
+    let client = create_client()?;
+    let response = client.patch(&url).json(&json!({ "name": new_name })).send();
+
+    match response {
+        Ok(resp) => match resp.status() {
+            StatusCode::OK | StatusCode::CREATED => {
+                resp.json().map_err(|e| Error::GitHubApi(e.to_string()))
+            }
+            StatusCode::FORBIDDEN => Err(Error::GitHubApi(
+                "Permission denied. Ensure your GitHub token has the 'Administration' repository permission (write).".to_string(),
+            )),
+            StatusCode::UNPROCESSABLE_ENTITY => Err(Error::GitHubApi(format!(
+                "Cannot rename repository to '{}'. The name may be taken or invalid.",
+                new_name
+            ))),
+            _ => Err(Error::GitHubApi(format!(
+                "Failed to update repository name: {}",
+                resp.status()
+            ))),
+        },
         Err(e) => Err(Error::GitHubApi(e.to_string())),
     }
 }
@@ -80,7 +108,7 @@ mod tests {
         let owner = "test-owner";
         let repo = "test-repo";
 
-        test_helpers::mock_github_repo(owner, owner, repo, repo);
+        test_helpers::mock_github_get_repo(owner, owner, repo, repo);
 
         {
             CONFIG.set_github_token("")?;
@@ -93,7 +121,7 @@ mod tests {
         }
 
         let private_repo = format!("{}-private", repo);
-        test_helpers::mock_github_error(owner, &private_repo, 404);
+        test_helpers::mock_github_get_repo_error(owner, &private_repo);
 
         {
             let result = get_repo_info(owner, &private_repo);
