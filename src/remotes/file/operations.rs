@@ -82,11 +82,6 @@ pub fn push_to_file_remote(repo: &Repository, remote_url: &str, dry_run: bool) -
     }
     git::set_remote_url(repo, remote_url, &new_remote_url, dry_run)?;
 
-    println!(
-        "Successfully renamed remote repository from '{}' to '{}'",
-        remote_repo_name, local_directory_name
-    );
-
     Ok(())
 }
 

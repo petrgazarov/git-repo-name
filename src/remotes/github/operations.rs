@@ -56,9 +56,10 @@ pub fn push_to_github_remote(repo: &Repository, remote_url: &str, dry_run: bool)
             "Would update GitHub repository name from '{}' to '{}'",
             remote_repo_name, local_directory_name
         );
+        let would_change_url = format_new_remote_url(remote_url, &owner, &local_directory_name);
         println!(
-            "Would change 'origin' remote from '{}' to a URL with the new name",
-            remote_url
+            "Would change 'origin' remote from '{}' to '{}'",
+            remote_url, would_change_url
         );
         return Ok(());
     }
@@ -71,11 +72,6 @@ pub fn push_to_github_remote(repo: &Repository, remote_url: &str, dry_run: bool)
     };
 
     let resolved_owner = updated_repo.full_name.split('/').next().unwrap_or(&owner);
-
-    println!(
-        "Successfully updated GitHub repository from '{}' to '{}'",
-        remote_repo_name, updated_repo.name
-    );
 
     let new_remote_url = format_new_remote_url(remote_url, resolved_owner, &updated_repo.name);
     git::set_remote_url(repo, remote_url, &new_remote_url, false)?;
@@ -504,8 +500,11 @@ mod tests {
         let output = fixture.run_push(old_url, false)?;
 
         assert!(
-            output.contains("Successfully updated GitHub repository from 'old-name' to 'new-name'"),
-            "Expected success message, got: {}",
+            output.contains(&format!(
+                "Changing 'origin' remote from '{}' to '{}'",
+                old_url, expected_new_url
+            )),
+            "Expected changing remote message, got: {}",
             output
         );
 
@@ -552,7 +551,10 @@ mod tests {
         let output = fixture.run_push(old_url, false)?;
 
         assert!(
-            output.contains("Successfully updated GitHub repository from 'old-name' to 'new-name'"),
+            output.contains(&format!(
+                "Changing 'origin' remote from '{}' to '{}'",
+                old_url, expected_new_url
+            )),
             "Expected success message, got: {}",
             output
         );
