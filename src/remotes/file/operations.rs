@@ -90,7 +90,7 @@ mod tests {
     use super::*;
     use crate::test_helpers;
 
-    struct PullTestFixture {
+    struct PullTestSetup {
         temp: assert_fs::TempDir,
         bare_repo_path: std::path::PathBuf,
         repo: git2::Repository,
@@ -98,95 +98,39 @@ mod tests {
         _guard: test_helpers::CurrentDirGuard,
     }
 
-    impl PullTestFixture {
-        fn new(bare_repo_name: &str, local_repo_name: &str) -> anyhow::Result<Self> {
-            let guard = test_helpers::CurrentDirGuard::new();
-            let temp = assert_fs::TempDir::new()?;
-            test_helpers::setup_test_config(temp.path())?;
+    fn setup_for_pull_test(
+        bare_repo_name: &str,
+        local_repo_name: &str,
+    ) -> anyhow::Result<PullTestSetup> {
+        let guard = test_helpers::CurrentDirGuard::new();
+        let temp = assert_fs::TempDir::new()?;
+        test_helpers::setup_test_config(temp.path())?;
 
-            let bare_repo_path = test_helpers::create_bare_repo(&temp, bare_repo_name)?;
-            let (repo_dir, repo) = test_helpers::create_main_repo(&temp, local_repo_name)?;
+        let bare_repo_path = test_helpers::create_bare_repo(&temp, bare_repo_name)?;
+        let (repo_dir, repo) = test_helpers::create_main_repo(&temp, local_repo_name)?;
 
-            std::env::set_current_dir(&repo_dir)?;
+        std::env::set_current_dir(&repo_dir)?;
 
-            let canonical_remote_url = test_helpers::get_canonical_remote_url(&bare_repo_path)?;
+        let canonical_remote_url = test_helpers::get_canonical_remote_url(&bare_repo_path)?;
 
-            Ok(Self {
-                temp,
-                bare_repo_path,
-                repo,
-                canonical_remote_url,
-                _guard: guard,
-            })
-        }
-
-        fn run_pull(&self, remote_url: &str, dry_run: bool) -> anyhow::Result<String> {
-            let (output, _) = test_helpers::capture_stdout(|| {
-                pull_from_file_remote(&self.repo, remote_url, dry_run)
-            })?;
-
-            Ok(output)
-        }
-
-        fn assert_remote_url(&self, expected_url: &str) -> anyhow::Result<()> {
-            let remote_url = git::get_remote_url(&self.repo)?;
-            assert_eq!(remote_url, expected_url);
-            Ok(())
-        }
-    }
-
-    struct PushTestFixture {
-        temp: assert_fs::TempDir,
-        bare_repo_path: std::path::PathBuf,
-        repo: git2::Repository,
-        canonical_remote_url: String,
-        _guard: test_helpers::CurrentDirGuard,
-    }
-
-    impl PushTestFixture {
-        fn new(bare_repo_name: &str, local_repo_name: &str) -> anyhow::Result<Self> {
-            let guard = test_helpers::CurrentDirGuard::new();
-            let temp = assert_fs::TempDir::new()?;
-            test_helpers::setup_test_config(temp.path())?;
-
-            let bare_repo_path = test_helpers::create_bare_repo(&temp, bare_repo_name)?;
-            let (repo_dir, repo) = test_helpers::create_main_repo(&temp, local_repo_name)?;
-
-            std::env::set_current_dir(&repo_dir)?;
-
-            let canonical_remote_url = test_helpers::get_canonical_remote_url(&bare_repo_path)?;
-
-            Ok(Self {
-                temp,
-                bare_repo_path,
-                repo,
-                canonical_remote_url,
-                _guard: guard,
-            })
-        }
-
-        fn run_push(&self, remote_url: &str, dry_run: bool) -> anyhow::Result<String> {
-            let (output, _) = test_helpers::capture_stdout(|| {
-                push_to_file_remote(&self.repo, remote_url, dry_run)
-            })?;
-
-            Ok(output)
-        }
-
-        fn assert_remote_url(&self, expected_url: &str) -> anyhow::Result<()> {
-            let remote_url = git::get_remote_url(&self.repo)?;
-            assert_eq!(remote_url, expected_url);
-            Ok(())
-        }
+        Ok(PullTestSetup {
+            temp,
+            bare_repo_path,
+            repo,
+            canonical_remote_url,
+            _guard: guard,
+        })
     }
 
     #[test]
     fn test_pull_up_to_date_dry_run() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("same-repo.git", "same-repo")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let pull_test_setup = setup_for_pull_test("same-repo.git", "same-repo")?;
+        let remote_url = pull_test_setup.canonical_remote_url.clone();
+        pull_test_setup.repo.remote("origin", &remote_url)?;
 
-        let output = fixture.run_pull(&remote_url, true)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &remote_url, true)
+        })?;
 
         assert!(
             output.contains("Directory name and remote URL already up-to-date"),
@@ -194,70 +138,96 @@ mod tests {
             output
         );
 
-        fixture.assert_remote_url(&remote_url)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "same-repo", true)?;
+        assert_eq!(remote_url, git::get_remote_url(&pull_test_setup.repo)?);
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "same-repo", true)?;
 
         Ok(())
     }
 
     #[test]
     fn test_pull_up_to_date() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("same-repo.git", "same-repo")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let pull_test_setup = setup_for_pull_test("same-repo.git", "same-repo")?;
+        let remote_url = pull_test_setup.canonical_remote_url.clone();
+        pull_test_setup.repo.remote("origin", &remote_url)?;
 
-        fixture.run_pull(&remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &remote_url, false)
+        })?;
 
-        fixture.assert_remote_url(&remote_url)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "same-repo", true)?;
+        assert!(
+            output.contains("Directory name and remote URL already up-to-date"),
+            "Expected up-to-date message, got: {}",
+            output
+        );
+
+        assert_eq!(remote_url, git::get_remote_url(&pull_test_setup.repo)?);
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "same-repo", true)?;
 
         Ok(())
     }
 
     #[test]
     fn test_pull_remote_url_update_dry_run() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("test-repo.git", "test-repo")?;
+        let pull_test_setup = setup_for_pull_test("test-repo.git", "test-repo")?;
         let relative_remote_url = "file://../test-repo.git";
-        fixture.repo.remote("origin", relative_remote_url)?;
+        pull_test_setup.repo.remote("origin", relative_remote_url)?;
 
-        let output = fixture.run_pull(relative_remote_url, true)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &relative_remote_url, true)
+        })?;
 
         assert!(
             output.contains(&format!(
                 "Would change 'origin' remote from '{}' to '{}'",
-                relative_remote_url, fixture.canonical_remote_url
+                relative_remote_url, pull_test_setup.canonical_remote_url
             )),
             "Expected remote URL update message, got: {}",
             output
         );
-
-        fixture.assert_remote_url(relative_remote_url)?;
+        assert_eq!(
+            relative_remote_url,
+            git::get_remote_url(&pull_test_setup.repo)?
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_pull_remote_url_update() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("test-repo.git", "test-repo")?;
+        let pull_test_setup = setup_for_pull_test("test-repo.git", "test-repo")?;
         let relative_remote_url = "file://../test-repo.git";
-        fixture.repo.remote("origin", relative_remote_url)?;
+        pull_test_setup.repo.remote("origin", relative_remote_url)?;
 
-        fixture.run_pull(relative_remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &relative_remote_url, false)
+        })?;
 
-        fixture.assert_remote_url(&fixture.canonical_remote_url)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "test-repo", true)?;
+        assert!(
+            output.contains(&format!(
+                "Changing 'origin' remote from '{}' to '{}'",
+                relative_remote_url, pull_test_setup.canonical_remote_url
+            )),
+            "Expected remote URL update message, got: {}",
+            output
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_pull_directory_rename_dry_run() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("new-name.git", "old-name")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let pull_test_setup = setup_for_pull_test("new-name.git", "old-name")?;
+        let remote_url = pull_test_setup.canonical_remote_url.clone();
+        pull_test_setup.repo.remote("origin", &remote_url)?;
 
-        let output = fixture.run_pull(&remote_url, true)?;
-        let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &remote_url, true)
+        })?;
+        let parent_dir = pull_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
 
         assert!(
             output.contains(&format!(
@@ -268,39 +238,63 @@ mod tests {
             "Expected directory rename message, got: {}",
             output
         );
-
-        test_helpers::assert_directory_existence(&fixture.temp, "old-name", true)?;
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "old-name", true)?;
 
         Ok(())
     }
 
     #[test]
     fn test_pull_directory_rename() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("new-name.git", "old-name")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let pull_test_setup = setup_for_pull_test("new-name.git", "old-name")?;
+        let remote_url = pull_test_setup.canonical_remote_url.clone();
+        pull_test_setup.repo.remote("origin", &remote_url)?;
+        let parent_dir = pull_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
 
-        fixture.run_pull(&remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &remote_url, false)
+        })?;
 
-        test_helpers::assert_directory_existence(&fixture.temp, "old-name", false)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "new-name", true)?;
+        assert!(
+            output.contains(&format!(
+                "Renaming directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
+            "Expected directory rename message, got: {}",
+            output
+        );
+
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "old-name", false)?;
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "new-name", true)?;
 
         Ok(())
     }
 
     #[test]
     fn test_pull_both_updates_dry_run() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("new-name.git", "old-name")?;
+        let pull_test_setup = setup_for_pull_test("new-name.git", "old-name")?;
         let relative_remote_url = "file://../new-name.git";
-        fixture.repo.remote("origin", relative_remote_url)?;
+        pull_test_setup
+            .repo
+            .remote("origin", &relative_remote_url)?;
 
-        let output = fixture.run_pull(relative_remote_url, true)?;
-        let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &relative_remote_url, true)
+        })?;
+        let parent_dir = pull_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
 
         assert!(
             output.contains(&format!(
                 "Would change 'origin' remote from '{}' to '{}'",
-                relative_remote_url, fixture.canonical_remote_url
+                relative_remote_url, pull_test_setup.canonical_remote_url
             )),
             "Expected remote URL update message, got: {}",
             output
@@ -315,23 +309,46 @@ mod tests {
             output
         );
 
-        fixture.assert_remote_url(relative_remote_url)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "old-name", true)?;
+        assert_eq!(
+            relative_remote_url,
+            git::get_remote_url(&pull_test_setup.repo)?
+        );
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "old-name", true)?;
 
         Ok(())
     }
 
     #[test]
     fn test_pull_both_updates() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("new-name.git", "old-name")?;
+        let pull_test_setup = setup_for_pull_test("new-name.git", "old-name")?;
         let relative_remote_url = "file://../new-name.git";
-        fixture.repo.remote("origin", relative_remote_url)?;
+        pull_test_setup.repo.remote("origin", relative_remote_url)?;
+        let parent_dir = pull_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
 
-        fixture.run_pull(relative_remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            pull_from_file_remote(&pull_test_setup.repo, &relative_remote_url, false)
+        })?;
 
-        fixture.assert_remote_url(&fixture.canonical_remote_url)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "old-name", false)?;
-        test_helpers::assert_directory_existence(&fixture.temp, "new-name", true)?;
+        assert!(
+            output.contains(&format!(
+                "Renaming directory from '{}' to '{}'",
+                parent_dir.join("old-name").display(),
+                parent_dir.join("new-name").display()
+            )),
+            "Expected directory rename message, got: {}",
+            output
+        );
+
+        assert_eq!(
+            pull_test_setup.canonical_remote_url,
+            git::get_remote_url(&pull_test_setup.repo)?
+        );
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "old-name", false)?;
+        test_helpers::assert_directory_existence(&pull_test_setup.temp, "new-name", true)?;
 
         Ok(())
     }
@@ -364,28 +381,62 @@ mod tests {
 
     #[test]
     fn test_pull_relative_and_absolute() -> anyhow::Result<()> {
-        let fixture = PullTestFixture::new("abs-repo.git", "abs-repo")?;
-        let canonical_url = fixture.canonical_remote_url.clone();
+        let pull_test_setup = setup_for_pull_test("abs-repo.git", "abs-repo")?;
+        let canonical_url = pull_test_setup.canonical_remote_url.clone();
 
-        fixture.repo.remote("origin", "../abs-repo.git")?;
-        let result_rel = pull_from_file_remote(&fixture.repo, "../abs-repo.git", false);
+        pull_test_setup.repo.remote("origin", "../abs-repo.git")?;
+        let result_rel = pull_from_file_remote(&pull_test_setup.repo, "../abs-repo.git", false);
         assert!(result_rel.is_ok());
 
-        fixture.repo.remote_delete("origin")?;
-        fixture.repo.remote("origin", &canonical_url)?;
-        let result_abs = pull_from_file_remote(&fixture.repo, &canonical_url, false);
+        pull_test_setup.repo.remote_delete("origin")?;
+        pull_test_setup.repo.remote("origin", &canonical_url)?;
+        let result_abs = pull_from_file_remote(&pull_test_setup.repo, &canonical_url, false);
         assert!(result_abs.is_ok());
 
         Ok(())
     }
 
+    struct PushTestSetup {
+        temp: assert_fs::TempDir,
+        bare_repo_path: std::path::PathBuf,
+        repo: git2::Repository,
+        canonical_remote_url: String,
+        _guard: test_helpers::CurrentDirGuard,
+    }
+
+    fn setup_for_push_test(
+        bare_repo_name: &str,
+        local_repo_name: &str,
+    ) -> anyhow::Result<PushTestSetup> {
+        let guard = test_helpers::CurrentDirGuard::new();
+        let temp = assert_fs::TempDir::new()?;
+        test_helpers::setup_test_config(temp.path())?;
+
+        let bare_repo_path = test_helpers::create_bare_repo(&temp, bare_repo_name)?;
+        let (repo_dir, repo) = test_helpers::create_main_repo(&temp, local_repo_name)?;
+
+        std::env::set_current_dir(&repo_dir)?;
+
+        let canonical_remote_url = test_helpers::get_canonical_remote_url(&bare_repo_path)?;
+
+        Ok(PushTestSetup {
+            temp,
+            bare_repo_path,
+            repo,
+            canonical_remote_url,
+            _guard: guard,
+        })
+    }
+
     #[test]
     fn test_push_already_matches() -> anyhow::Result<()> {
-        let fixture = PushTestFixture::new("test-repo.git", "test-repo")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let push_test_setup = setup_for_push_test("test-repo.git", "test-repo")?;
+        let remote_url = push_test_setup.canonical_remote_url.clone();
+        push_test_setup.repo.remote("origin", &remote_url)?;
 
-        let output = fixture.run_push(&remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            push_to_file_remote(&push_test_setup.repo, &remote_url, false)
+        })?;
 
         assert!(
             output.contains("Remote repository name already matches the local directory name"),
@@ -393,9 +444,9 @@ mod tests {
             output
         );
 
-        fixture.assert_remote_url(&remote_url)?;
+        assert_eq!(remote_url, git::get_remote_url(&push_test_setup.repo)?);
         assert!(
-            fixture.bare_repo_path.exists(),
+            push_test_setup.bare_repo_path.exists(),
             "Repository should still exist"
         );
 
@@ -404,12 +455,18 @@ mod tests {
 
     #[test]
     fn test_push_rename_dry_run() -> anyhow::Result<()> {
-        let fixture = PushTestFixture::new("old-name.git", "new-name")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
+        let push_test_setup = setup_for_push_test("old-name.git", "new-name")?;
+        let remote_url = push_test_setup.canonical_remote_url.clone();
+        push_test_setup.repo.remote("origin", &remote_url)?;
 
-        let output = fixture.run_push(&remote_url, true)?;
-        let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            push_to_file_remote(&push_test_setup.repo, &remote_url, true)
+        })?;
+        let parent_dir = push_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
 
         assert!(
             output.contains(&format!(
@@ -429,9 +486,9 @@ mod tests {
             output
         );
 
-        fixture.assert_remote_url(&remote_url)?;
+        assert_eq!(remote_url, git::get_remote_url(&push_test_setup.repo)?);
         assert!(
-            fixture.bare_repo_path.exists(),
+            push_test_setup.bare_repo_path.exists(),
             "Original repository should still exist"
         );
         assert!(
@@ -444,13 +501,19 @@ mod tests {
 
     #[test]
     fn test_push_rename() -> anyhow::Result<()> {
-        let fixture = PushTestFixture::new("old-name.git", "new-name")?;
-        let remote_url = fixture.canonical_remote_url.clone();
-        fixture.repo.remote("origin", &remote_url)?;
-        let parent_dir = fixture.bare_repo_path.parent().unwrap().canonicalize()?;
+        let push_test_setup = setup_for_push_test("old-name.git", "new-name")?;
+        let remote_url = push_test_setup.canonical_remote_url.clone();
+        push_test_setup.repo.remote("origin", &remote_url)?;
+        let parent_dir = push_test_setup
+            .bare_repo_path
+            .parent()
+            .unwrap()
+            .canonicalize()?;
         let new_repo_path = parent_dir.join("new-name.git");
 
-        let output = fixture.run_push(&remote_url, false)?;
+        let (output, _) = test_helpers::capture_stdout(|| {
+            push_to_file_remote(&push_test_setup.repo, &remote_url, false)
+        })?;
 
         assert!(
             output.contains(&format!(
@@ -463,25 +526,28 @@ mod tests {
         );
 
         assert!(
-            !fixture.bare_repo_path.exists(),
+            !push_test_setup.bare_repo_path.exists(),
             "Original repository should be gone"
         );
         assert!(new_repo_path.exists(), "New repository should exist");
 
         let expected_new_url = remote_url.replace("old-name.git", "new-name.git");
-        fixture.assert_remote_url(&expected_new_url)?;
+        assert_eq!(
+            expected_new_url,
+            git::get_remote_url(&push_test_setup.repo)?
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_push_nonexistent_remote() -> anyhow::Result<()> {
-        let fixture = PushTestFixture::new("existing-repo.git", "local-repo")?;
-        let nonexistent_path = fixture.temp.path().join("nonexistent-repo.git");
+        let push_test_setup = setup_for_push_test("existing-repo.git", "local-repo")?;
+        let nonexistent_path = push_test_setup.temp.path().join("nonexistent-repo.git");
         let nonexistent_url = format!("file://{}", nonexistent_path.display());
-        fixture.repo.remote("origin", &nonexistent_url)?;
+        push_test_setup.repo.remote("origin", &nonexistent_url)?;
 
-        let result = fixture.run_push(&nonexistent_url, false);
+        let result = push_to_file_remote(&push_test_setup.repo, &nonexistent_url, false);
 
         match result {
             Err(e) => {
