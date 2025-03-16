@@ -1,33 +1,32 @@
 # git-repo-name
 
-`git-repo-name` syncs repository name between your local git repo and remote. It extends `git` and works with GitHub and file remotes.
+`git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name. It simplifies the process of renaming repositories, supporting bidirectional syncing with a familiar push/pull command syntax.
 
-## Usage
+You can use it to:
 
-`git-repo-name` provides three main commands:
+- rename a repo on GitHub, then run `git repo-name pull` to update the local git directory name
+- rename a local git directory, then run `git repo-name push` to rename the GitHub repo
+
+## Detailed Usage
+
+`git-repo-name` provides four main commands:
 
 ```sh
-git repo-name pull    # Pull repository name from remote and update local directory name
-git repo-name push    # Update remote repository name with local directory name
-git repo-name fetch   # Fetch repository name from remote without making changes
-git repo-name config  # Configure settings for git-repo-name
+git repo-name pull    # Fetch repo name from the remote and rename local git directory name to match it
+git repo-name push    # Rename repo name on the remote with the local git directory name
+git repo-name fetch   # Fetch repo name from the remote without making changes
+git repo-name config  # Configure settings (GitHub token and default remote)
 ```
 
-### Pull
+### <u>pull</u>
 
-Updates the local directory name with the repository name from the remote.
+Renames the local git directory name with the remote repository name.
+
+_Note: For private GitHub repos, this requires a GitHub token with metadata permission (read). Public repos do not require a token._
 
 ```sh
 git repo-name pull [OPTIONS]
 ```
-
-#### Options
-
-- `-r, --remote <REMOTE>`: Override the default git remote [default: origin]
-
-  - Use this to specify a different remote if your repository has multiple remotes
-
-- `-n, --dry-run`: Print actions without executing them
 
 **Examples:**
 
@@ -35,31 +34,22 @@ git repo-name pull [OPTIONS]
 # Basic usage
 git repo-name pull
 
-# Use a different remote than origin
+# Specify a remote [default: origin]
 git repo-name pull -r upstream
 
 # Preview what would happen without making changes
 git repo-name pull -n
-
-# Combine multiple options
-git repo-name pull -r upstream -n
 ```
 
-### Push
+### <u>push</u>
 
-Updates the remote repository name with the local directory name.
+Updates the repository name on the remote with the local root directory name.
+
+_Note: For GitHub repos, this requires a GitHub token with administration permission (write)._
 
 ```sh
 git repo-name push [OPTIONS]
 ```
-
-#### Options
-
-- `-r, --remote <REMOTE>`: Override the default git remote [default: origin]
-
-  - Use this to specify a different remote if your repository has multiple remotes
-
-- `-n, --dry-run`: Print actions without executing them
 
 **Examples:**
 
@@ -67,17 +57,14 @@ git repo-name push [OPTIONS]
 # Basic usage
 git repo-name push
 
-# Use a different remote than origin
+# Specify a remote [default: origin]
 git repo-name push -r upstream
 
 # Preview what would happen without making changes
 git repo-name push -n
-
-# Combine multiple options
-git repo-name push -r upstream -n
 ```
 
-### Fetch
+### <u>fetch</u>
 
 Retrieves the repository name from the remote without making any changes.
 
@@ -85,62 +72,58 @@ Retrieves the repository name from the remote without making any changes.
 git repo-name fetch [OPTIONS]
 ```
 
-#### Options
-
-- `-r, --remote <REMOTE>`: Override the default git remote [default: origin]
-  - Use this to specify a different remote if your repository has multiple remotes
-
 **Examples:**
 
 ```bash
-# Get repository name from default remote (origin)
+# Basic usage
 git repo-name fetch
 
-# Get repository name from a specific remote
+# Specify a remote [default: origin]
 git repo-name fetch -r upstream
 ```
 
-### Config
+### <u>config</u>
 
-View or set configuration options for git-repo-name.
+View or set configuration options.
 
 ```sh
 git repo-name config <KEY> [VALUE]
 ```
 
-#### Arguments
+#### Configuration Keys
 
-- `KEY`: The configuration key to get or set
-- `VALUE`: (Optional) The value to set for the configuration key. If not provided, displays the current value.
+- `github-token`: GitHub personal access token for authenticating GitHub API requests.
 
-#### Available Configuration Keys
+  Use [GitHub's Fine-grained personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) (recommended) with:
 
-- `github-token`: GitHub personal access token for accessing private repositories and modifying repositories
+  - **Metadata permission (read)**: For `pull` and `fetch` commands with private repos
+  - **Administration permission (write)**: For `push` command with any repos
 
-  - **When it's needed**:
-    - Required when working with private repositories or when using `push` command.
-  - **Best practice**: Use [GitHub's Fine-grained personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token) with:
-    - **Metadata permission (read)**: To fetch private repository names and URLs
-    - **Administration permission (write)**: To rename repositories on GitHub
+  Examples:
 
-- `default-remote`: The default remote to use when none is specified (defaults to "origin")
+  ```sh
+  # View GitHub token
+  git repo-name config github-token
 
-**Examples:**
+  # Set GitHub token
+  git repo-name config github-token ghp_your_token_here
+  ```
 
-```bash
-# View a configuration value
-git repo-name config default-remote
+- `default-remote`: The remote to use when none is specified (defaults to "origin")
 
-# Set a configuration value
-git repo-name config default-remote upstream
+  Examples:
 
-# Set GitHub token
-git repo-name config github-token ghp_your_token_here
-```
+  ```sh
+  # View default remote
+  git repo-name config default-remote
+
+  # Set default remote
+  git repo-name config default-remote upstream
+  ```
 
 ## Installation
 
-### Homebrew (recommended)
+### Install with Homebrew (recommended)
 
 ```bash
 brew tap petrgazarov/git-repo-name
@@ -159,14 +142,10 @@ Alternatively, you can clone this repository and build from source using Cargo:
 cargo install --git https://github.com/petrgazarov/git-repo-name.git
 ```
 
-## Supported remote repositories
+## Supported remotes
 
-git-repo-name currently supports GitHub and file remotes.
+Currently supports GitHub and file (bare) remotes. Contributions for GitLab, Bitbucket, and others are welcome!
 
-## Thanks
+## Acknowledgments
 
-[git-open](https://github.com/paulirish/git-open) was the original inspiration for this project.
-
-## Contributing & Development
-
-Please open an issue or submit a PR. Especially welcome are feature contributions and bug reports/fixes.
+Inspired by [git-open](https://github.com/paulirish/git-open) — an awesome project you should check out.
