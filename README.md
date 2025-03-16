@@ -18,15 +18,11 @@ git repo-name fetch   # Fetch repo name from the remote without making changes
 git repo-name config  # Configure settings (GitHub token and default remote)
 ```
 
-### <u>pull</u>
+### pull
 
 Renames the local git directory name with the remote repository name.
 
 _Note: For private GitHub repos, this requires a GitHub token with metadata permission (read). Public repos do not require a token._
-
-```sh
-git repo-name pull [OPTIONS]
-```
 
 **Examples:**
 
@@ -41,15 +37,11 @@ git repo-name pull -r upstream
 git repo-name pull -n
 ```
 
-### <u>push</u>
+### push
 
 Updates the repository name on the remote with the local root directory name.
 
 _Note: For GitHub repos, this requires a GitHub token with administration permission (write)._
-
-```sh
-git repo-name push [OPTIONS]
-```
 
 **Examples:**
 
@@ -64,13 +56,9 @@ git repo-name push -r upstream
 git repo-name push -n
 ```
 
-### <u>fetch</u>
+### fetch
 
 Retrieves the repository name from the remote without making any changes.
-
-```sh
-git repo-name fetch [OPTIONS]
-```
 
 **Examples:**
 
@@ -82,13 +70,9 @@ git repo-name fetch
 git repo-name fetch -r upstream
 ```
 
-### <u>config</u>
+### config
 
 View or set configuration options.
-
-```sh
-git repo-name config <KEY> [VALUE]
-```
 
 #### Configuration Keys
 
