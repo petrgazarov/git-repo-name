@@ -118,6 +118,15 @@ brew install git-repo-name
 
 Pre-compiled binaries are available on the [Releases page](https://github.com/petrgazarov/git-repo-name/releases).
 
+When downloading binaries directly, you'll need to manually set up shell integration:
+
+1. Download both the binary and the shell script from the releases page
+2. Place the binary in your PATH as `git-repo-name-bin`
+3. Place the shell script in your PATH as `git-repo-name` and make it executable:
+   ```bash
+   chmod +x /path/to/git-repo-name
+   ```
+
 ### Build from source
 
 Alternatively, you can clone this repository and build from source using Cargo:
@@ -125,6 +134,18 @@ Alternatively, you can clone this repository and build from source using Cargo:
 ```bash
 cargo install --git https://github.com/petrgazarov/git-repo-name.git
 ```
+
+When building from source, follow these steps to enable shell integration:
+
+1. Download the shell script from the repository and make it executable:
+   ```bash
+   curl -o /usr/local/bin/git-repo-name https://raw.githubusercontent.com/petrgazarov/git-repo-name/main/shell/git-repo-name.sh
+   chmod +x /usr/local/bin/git-repo-name
+   ```
+2. Rename the cargo-installed binary:
+   ```bash
+   mv $(which git-repo-name) $(dirname $(which git-repo-name))/git-repo-name-bin
+   ```
 
 ## Supported remotes
 

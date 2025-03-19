@@ -21,13 +21,23 @@ class GitRepoName < Formula
     def install
       if Hardware::CPU.intel?
         filename = File.basename("${DARWIN_X64_URL}")
-        bin.install filename => "git-repo-name"
+        bin.install filename => "git-repo-name-bin"
       end
 
       if Hardware::CPU.arm?
         filename = File.basename("${DARWIN_ARM64_URL}")
-        bin.install filename => "git-repo-name"
+        bin.install filename => "git-repo-name-bin"
       end
+      
+      # Install the shell wrapper
+      (bin/"git-repo-name").write <<~EOS
+        #!/bin/sh
+        # This shell script wrapper handles directory changes when using git-repo-name
+        exec /bin/sh "#{share}/git-repo-name/git-repo-name.sh" "$@"
+      EOS
+      
+      chmod 0755, bin/"git-repo-name"
+      (share/"git-repo-name").install "${SHELL_SCRIPT_PATH}" => "git-repo-name.sh"
     end
   end
 
@@ -45,13 +55,23 @@ class GitRepoName < Formula
     def install
       if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
         filename = File.basename("${LINUX_ARM64_URL}")
-        bin.install filename => "git-repo-name"
+        bin.install filename => "git-repo-name-bin"
       end
 
       if Hardware::CPU.intel?
         filename = File.basename("${LINUX_X64_URL}")
-        bin.install filename => "git-repo-name"
+        bin.install filename => "git-repo-name-bin"
       end
+      
+      # Install the shell wrapper
+      (bin/"git-repo-name").write <<~EOS
+        #!/bin/sh
+        # This shell script wrapper handles directory changes when using git-repo-name
+        exec /bin/sh "#{share}/git-repo-name/git-repo-name.sh" "$@"
+      EOS
+      
+      chmod 0755, bin/"git-repo-name"
+      (share/"git-repo-name").install "${SHELL_SCRIPT_PATH}" => "git-repo-name.sh"
     end
   end
 

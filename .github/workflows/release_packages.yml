@@ -38,6 +38,7 @@ jobs:
         run: |
           export VERSION="${{ steps.version.outputs.value }}"
           gh release download --repo petrgazarov/git-repo-name "${VERSION}" -p 'git-repo-name*apple-darwin*' -p 'git-repo-name*linux-gnu*'
+          gh release download --repo petrgazarov/git-repo-name "${VERSION}" -p 'git-repo-name.sh'
 
           # Map for full Rust target triples
           for i in \
@@ -56,7 +57,10 @@ jobs:
             export "${URL_VAR}=https://github.com/petrgazarov/git-repo-name/releases/download/${VERSION}/git-repo-name-${VERSION}-${RUST_TARGET}"
           done
 
-          envsubst '$VERSION,$DARWIN_X64_URL,$DARWIN_X64_SHA256,$DARWIN_ARM64_URL,$DARWIN_ARM64_SHA256,$LINUX_X64_URL,$LINUX_X64_SHA256,$LINUX_ARM64_URL,$LINUX_ARM64_SHA256' < "./git-repo-name/.github/templates/git_repo_name_tap_template.rb" > ./homebrew-git-repo-name/git-repo-name.rb
+          # Add shell script path to release assets
+          export SHELL_SCRIPT_PATH="https://github.com/petrgazarov/git-repo-name/releases/download/${VERSION}/git-repo-name.sh"
+
+          envsubst '$VERSION,$DARWIN_X64_URL,$DARWIN_X64_SHA256,$DARWIN_ARM64_URL,$DARWIN_ARM64_SHA256,$LINUX_X64_URL,$LINUX_X64_SHA256,$LINUX_ARM64_URL,$LINUX_ARM64_SHA256,$SHELL_SCRIPT_PATH' < "./git-repo-name/.github/templates/git_repo_name_tap_template.rb" > ./homebrew-git-repo-name/git-repo-name.rb
 
       - name: Commit and push updated formula
         working-directory: homebrew-git-repo-name

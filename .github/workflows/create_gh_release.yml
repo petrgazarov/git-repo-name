@@ -76,6 +76,22 @@ jobs:
           path: ${{ steps.get-binary-name.outputs.value }}
           if-no-files-found: error
 
+  prepare-shell-script:
+    name: Prepare shell script
+    runs-on: ubuntu-latest
+    needs: get-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Upload shell script artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-repo-name.sh
+          path: shell/git-repo-name.sh
+          if-no-files-found: error
+
   verify-version:
     name: Verify version
     needs: [get-version, build]
@@ -100,7 +116,7 @@ jobs:
 
   create-release:
     name: Create draft release
-    needs: [get-version, build, verify-version]
+    needs: [get-version, build, verify-version, prepare-shell-script]
     runs-on: ubuntu-latest
 
     steps:
@@ -120,3 +136,4 @@ jobs:
             git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin/git-repo-name-${{ env.VERSION }}-aarch64-apple-darwin
             git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu/git-repo-name-${{ env.VERSION }}-x86_64-unknown-linux-gnu
             git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu/git-repo-name-${{ env.VERSION }}-aarch64-unknown-linux-gnu
+            git-repo-name.sh/git-repo-name.sh

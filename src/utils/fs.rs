@@ -40,6 +40,9 @@ pub fn rename_directory(current_path: &Path, new_name: &str, dry_run: bool) -> R
     std::fs::rename(current_path, &new_path)
         .map_err(|e| Error::Fs(format!("Failed to rename directory: {}", e)))?;
 
+    // Output a machine-readable marker for the shell wrapper to detect
+    println!("GRN_DIR_CHANGE:{}:{}", current_display, new_display);
+
     Ok(())
 }
 
@@ -82,11 +85,33 @@ mod tests {
         let old_dir = temp.child("old_name");
         old_dir.create_dir_all()?;
 
-        rename_directory(old_dir.path(), "new_name", false)?;
+        let old_path = old_dir
+            .path()
+            .to_string_lossy()
+            .trim_end_matches('/')
+            .to_string();
+        let new_path = temp
+            .path()
+            .join("new_name")
+            .to_string_lossy()
+            .trim_end_matches('/')
+            .to_string();
+
+        let (output, _) = crate::test_helpers::capture_stdout(|| {
+            rename_directory(old_dir.path(), "new_name", false)
+        })?;
 
         assert!(!old_dir.exists());
         let new_dir = temp.child("new_name");
         assert!(new_dir.exists());
+
+        let expected_marker = format!("GRN_DIR_CHANGE:{}:{}", old_path, new_path);
+        assert!(
+            output.contains(&expected_marker),
+            "Expected output to contain marker '{}', but got: {}",
+            expected_marker,
+            output
+        );
 
         Ok(())
     }
