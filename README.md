@@ -5,7 +5,7 @@
 You can use it to:
 
 - rename a repo on GitHub, then run `git repo-name pull` to update the local git directory name
-- rename a local git directory, then run `git repo-name push` to rename the GitHub repo
+- rename a local git directory, then run `git repo-name push` to rename the repo on GitHub
 
 ## Detailed Usage
 
