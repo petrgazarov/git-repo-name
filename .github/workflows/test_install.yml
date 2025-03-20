@@ -55,12 +55,14 @@ jobs:
           brew tap petrgazarov/git-repo-name
           brew install git-repo-name
 
-      - name: Install binary directly (Linux ARM)
+      - name: Install binary and shell script directly (Linux ARM)
         if: matrix.os == 'ubuntu-24.04-arm'
         run: |
           TAG="${{ steps.release-tag.outputs.tag }}"
-          # Download the ARM Linux binary
-          curl -L "https://github.com/${{ github.repository }}/releases/download/${TAG}/git-repo-name-${TAG}-aarch64-unknown-linux-gnu" -o git-repo-name
+          curl -L "https://github.com/${{ github.repository }}/releases/download/${TAG}/git-repo-name-${TAG}-aarch64-unknown-linux-gnu" -o git-repo-name-bin
+          chmod +x git-repo-name-bin
+          sudo mv git-repo-name-bin /usr/local/bin/
+          curl -L "https://github.com/${{ github.repository }}/releases/download/${TAG}/git-repo-name.sh" -o git-repo-name
           chmod +x git-repo-name
           sudo mv git-repo-name /usr/local/bin/
 
