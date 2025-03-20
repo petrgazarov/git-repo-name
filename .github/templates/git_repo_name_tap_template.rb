@@ -10,6 +10,7 @@ class GitRepoName < Formula
   resource "shell_script" do
     url "${SHELL_SCRIPT_PATH}"
     version "${VERSION}"
+    sha256 "${SHELL_SCRIPT_SHA256}"
   end
 
   on_macos do

@@ -59,8 +59,9 @@ jobs:
 
           # Add shell script path to release assets
           export SHELL_SCRIPT_PATH="https://github.com/petrgazarov/git-repo-name/releases/download/${VERSION}/git-repo-name.sh"
+          export SHELL_SCRIPT_SHA256=$(sha256sum git-repo-name.sh | cut -f1 -d' ')
 
-          envsubst '$VERSION,$DARWIN_X64_URL,$DARWIN_X64_SHA256,$DARWIN_ARM64_URL,$DARWIN_ARM64_SHA256,$LINUX_X64_URL,$LINUX_X64_SHA256,$LINUX_ARM64_URL,$LINUX_ARM64_SHA256,$SHELL_SCRIPT_PATH' < "./git-repo-name/.github/templates/git_repo_name_tap_template.rb" > ./homebrew-git-repo-name/git-repo-name.rb
+          envsubst '$VERSION,$DARWIN_X64_URL,$DARWIN_X64_SHA256,$DARWIN_ARM64_URL,$DARWIN_ARM64_SHA256,$LINUX_X64_URL,$LINUX_X64_SHA256,$LINUX_ARM64_URL,$LINUX_ARM64_SHA256,$SHELL_SCRIPT_PATH,$SHELL_SCRIPT_SHA256' < "./git-repo-name/.github/templates/git_repo_name_tap_template.rb" > ./homebrew-git-repo-name/git-repo-name.rb
 
       - name: Commit and push updated formula
         working-directory: homebrew-git-repo-name
