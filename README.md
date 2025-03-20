@@ -1,11 +1,11 @@
 # git-repo-name
 
-`git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name. It simplifies the process of renaming repositories, supporting bidirectional syncing with a familiar push/pull command syntax.
+`git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name. It simplifies the process of renaming repositories and works bidirectionally with a familiar push/pull command syntax.
 
 You can use it to:
 
-- rename a repo on GitHub, then run `git repo-name pull` to update the local git directory name
-- rename a local git directory, then run `git repo-name push` to rename the repo on GitHub
+- rename a repo on GitHub, then run `git repo-name pull` to update the local git directory name.
+- rename a local git directory, then run `git repo-name push` to rename the repo on GitHub.
 
 ## Detailed Usage
 
@@ -94,7 +94,7 @@ View or set configuration options.
 
   | Scenario                                   | PAT type                | Permissions required                                                  |
   | ------------------------------------------ | ----------------------- | --------------------------------------------------------------------- |
-  | Public repositories (pull/fetch only)      | N/A (no token required) | None                                                                  |
+  | Public repositories (`pull`/`fetch` only)  | N/A (no token required) | None                                                                  |
   | Private repositories owned by you          | Fine-grained            | Metadata (read) for `pull`/`fetch`; Administration (write) for `push` |
   | Organization repositories                  | Classic                 | repo scope                                                            |
   | Mixed personal & organization repositories | Classic                 | repo scope                                                            |
@@ -113,10 +113,18 @@ View or set configuration options.
 
 ### Install with Homebrew (recommended)
 
-```bash
-brew tap petrgazarov/git-repo-name
-brew install git-repo-name
-```
+1. Install the `git-repo-name` formula:
+
+   ```bash
+   brew tap petrgazarov/git-repo-name
+   brew install git-repo-name
+   ```
+
+2. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
+
+   ```sh
+   source "$(brew --prefix)/share/git-repo-name/git-repo-name.sh"
+   ```
 
 ### Direct binaries
 
@@ -131,6 +139,11 @@ When downloading binaries directly, you'll need to manually set up shell integra
    ```
 3. Place the binary in your PATH as `git-repo-name-bin`
 4. Place the shell script in your PATH as `git-repo-name`
+5. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
+
+   ```sh
+   source "$(which git-repo-name)"
+   ```
 
 ### Build from source
 
@@ -152,8 +165,15 @@ Follow these steps to enable shell integration:
    Replace `/usr/local/bin` with your preferred installation directory (ensure it's in your PATH).
 
 2. Rename the cargo-installed binary:
+
    ```bash
    mv $(which git-repo-name) $(dirname $(which git-repo-name))/git-repo-name-bin
+   ```
+
+3. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
+
+   ```sh
+   source "$(which git-repo-name)"
    ```
 
 ## Supported remotes

@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Shell wrapper for git-repo-name that handles directory changes when the 
-# repository directory is renamed during 'git repo-name pull' operations.
-__git_repo_name_wrapper() {
+# Shell wrapper for git-repo-name that handles directory changes
+# Can be used both as an executable and when sourced into a shell environment
+
+git_repo_name() {
     tmp_file=$(mktemp /tmp/git-repo-name-output.XXXXXX)
     
     # tee writes the full (raw) output to the temporary file,
@@ -34,12 +35,9 @@ __git_repo_name_wrapper() {
     return "$exit_code"
 }
 
-# Define our function as the git-repo-name command
-if [ -n "$BASH_VERSION" ] || [ -n "$ZSH_VERSION" ]; then
-    alias git-repo-name=__git_repo_name_wrapper
+# Define our function as the git-repo-name command.
+if (return 0 2>/dev/null); then
+    alias git-repo-name=git_repo_name
+else
+    git_repo_name "$@"
 fi
-
-# If this script is being executed directly, run the command
-if [ "$(basename "$0")" = "git-repo-name" ] || [ "$(basename "$0")" = "git-repo-name.sh" ]; then
-    __git_repo_name_wrapper "$@"
-fi 
