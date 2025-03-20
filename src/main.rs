@@ -6,7 +6,7 @@ use git_repo_name::{
 };
 
 #[derive(Parser)]
-#[command(author, version, about)]
+#[command(author, version, about, bin_name = "git repo-name")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
