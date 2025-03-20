@@ -178,7 +178,7 @@ Follow these steps to enable shell integration:
 
 ## Supported remotes
 
-`git-repo-name` Currently supports GitHub and file (bare) remotes. Contributions for GitLab, Bitbucket, and others are welcome!
+`git-repo-name` currently supports GitHub and file (bare) remotes. Contributions for GitLab, Bitbucket, and others are welcome!
 
 ## Acknowledgments
 
