@@ -52,16 +52,9 @@ class GitRepoName < Formula
 
     def caveats
       <<~EOS
-        By default, git-repo-name will print output and process directory changes,
-        but cannot automatically update your working directory when executed as a command.
-
-        For automatic directory changes (when using 'git repo-name pull'), 
-        add the following line to your shell profile (such as ~/.bashrc or ~/.zshrc):
+        Add the following line to your shell profile (such as ~/.bashrc or ~/.zshrc):
 
           source "$(brew --prefix)/share/git-repo-name/git-repo-name.sh"
-
-        After sourcing, reopening your terminal, or running 'source ~/.bashrc',
-        directory changes will happen automatically.
       EOS
     end
   end
@@ -105,16 +98,9 @@ class GitRepoName < Formula
 
     def caveats
       <<~EOS
-        By default, git-repo-name will print output and process directory changes,
-        but cannot automatically update your working directory when executed as a command.
-
-        For automatic directory changes (when using 'git repo-name pull'), 
-        add the following line to your shell profile (such as ~/.bashrc or ~/.zshrc):
+        Add the following line to your shell profile (such as ~/.bashrc or ~/.zshrc):
 
           source "$(brew --prefix)/share/git-repo-name/git-repo-name.sh"
-
-        After sourcing, reopening your terminal, or running 'source ~/.bashrc',
-        directory changes will happen automatically.
       EOS
     end
   end

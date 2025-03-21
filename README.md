@@ -1,30 +1,32 @@
 # git-repo-name
 
-`git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name. It simplifies the process of renaming repositories and works bidirectionally with a familiar push/pull command syntax.
+`git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name.
 
-You can use it to:
+It works bi-directionally and supports these two main use cases:
 
-- rename a repo on GitHub, then run `git repo-name pull` to update the local git directory name.
-- rename a local git directory, then run `git repo-name push` to rename the repo on GitHub.
+- When you rename a repo on GitHub, run `git repo-name pull` to update the local git directory name.
+- When you rename a local git directory, run `git repo-name push` to rename the repo on GitHub.
+
+In both cases, it makes an API call to GitHub, compares the repo name to the local directory name, and automatically renames the appropriate side.
 
 ## Detailed Usage
 
 `git-repo-name` provides four main commands:
 
 ```sh
-git repo-name pull    # Fetch repo name from the remote and rename local git directory name to match it
-git repo-name push    # Rename repo name on the remote with the local git directory name
-git repo-name fetch   # Fetch repo name from the remote without making changes
-git repo-name config  # Configure settings (GitHub token and default remote)
+git repo-name pull    # Fetches repo name from the remote and renames local git directory name to match it
+git repo-name push    # Renames repo name on the remote with the local git directory name
+git repo-name fetch   # Fetches repo name from the remote without making changes
+git repo-name config  # Configures settings (GitHub token and default remote)
 ```
 
 ### pull
 
-Renames the local git directory name with the remote repository name.
+Fetches repo name from the remote and renames local git directory name to match it.
 
 _Note: For private GitHub repos, this requires a GitHub PAT (see [Configuration Keys](#configuration-keys) for more details)._
 
-**Examples:**
+Examples
 
 ```bash
 # Basic usage
@@ -39,11 +41,11 @@ git repo-name pull -n
 
 ### push
 
-Updates the repository name on the remote with the local root directory name.
+Renames repo name on the remote with the local git directory name.
 
 _Note: For GitHub repos, this requires a GitHub PAT (see [Configuration Keys](#configuration-keys) for more details)._
 
-**Examples:**
+Examples
 
 ```bash
 # Basic usage
@@ -58,9 +60,9 @@ git repo-name push -n
 
 ### fetch
 
-Retrieves the repository name from the remote without making any changes.
+Fetches repo name from the remote without making changes.
 
-**Examples:**
+Examples
 
 ```bash
 # Basic usage
@@ -72,7 +74,7 @@ git repo-name fetch -r upstream
 
 ### config
 
-View or set configuration options.
+Configures settings.
 
 #### Configuration Keys
 
@@ -149,13 +151,13 @@ When downloading binaries directly, you'll need to manually set up shell integra
 
 Alternatively, you can clone this repository and build from source using Cargo:
 
-```bash
-cargo install --git https://github.com/petrgazarov/git-repo-name.git
-```
+1. Install and build the binary:
 
-Follow these steps to enable shell integration:
+   ```bash
+   cargo install --git https://github.com/petrgazarov/git-repo-name.git
+   ```
 
-1. Download the shell script from the repository and make it executable:
+2. Download the shell script from the repository and make it executable:
 
    ```bash
    curl -o /usr/local/bin/git-repo-name https://raw.githubusercontent.com/petrgazarov/git-repo-name/main/shell/git-repo-name.sh
@@ -164,13 +166,13 @@ Follow these steps to enable shell integration:
 
    Replace `/usr/local/bin` with your preferred installation directory (ensure it's in your PATH).
 
-2. Rename the cargo-installed binary:
+3. Rename the cargo-installed binary:
 
    ```bash
    mv $(which git-repo-name) $(dirname $(which git-repo-name))/git-repo-name-bin
    ```
 
-3. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
+4. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
 
    ```sh
    source "$(which git-repo-name)"
@@ -178,7 +180,7 @@ Follow these steps to enable shell integration:
 
 ## Supported remotes
 
-`git-repo-name` currently supports GitHub and file (bare) remotes. Contributions for GitLab, Bitbucket, and others are welcome!
+`git-repo-name` currently supports GitHub and file (bare) remotes.
 
 ## Acknowledgments
 
