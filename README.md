@@ -178,36 +178,6 @@ Alternatively, you can clone this repository and build from source using Cargo:
    source "$(which git-repo-name)"
    ```
 
-## ZSH / Shell Plugin Managers
-
-For Oh-My-Zsh, Oh-My-Bash, Zgen, Zplug, Zinit, Antigen:
-
-```bash
-# Oh-My-Zsh
-git clone https://github.com/petrgazarov/git-repo-name.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/git-repo-name
-# Add "git-repo-name" to your plugins list in ~/.zshrc
-
-# Oh-My-Bash
-git clone https://github.com/petrgazarov/git-repo-name.git ${OSH_CUSTOM:-~/.oh-my-bash/custom}/plugins/git-repo-name
-# Add "git-repo-name" to your Bash plugins configuration
-
-# Zgen
-# Add this to your .zshrc
-zgen load petrgazarov/git-repo-name
-
-# Zplug
-# Add this to your .zshrc
-zplug "petrgazarov/git-repo-name"
-
-# Zinit
-# Add this to your .zshrc
-zinit light petrgazarov/git-repo-name
-
-# Antigen
-# Add this to your .zshrc
-antigen bundle petrgazarov/git-repo-name
-```
-
 ## Supported remotes
 
 `git-repo-name` currently supports GitHub and file (bare) remotes.
