@@ -1,4 +1,4 @@
-name: Test Installation
+name: Test installation
 
 on:
   workflow_run:

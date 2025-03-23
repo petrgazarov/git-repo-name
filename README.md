@@ -1,5 +1,7 @@
 # git-repo-name
 
+[![Unit tests](https://github.com/petrgazarov/git-repo-name/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/petrgazarov/git-repo-name/actions)
+
 `git-repo-name` is a CLI tool that syncs your local git directory name with the remote repository name.
 
 It works bi-directionally and supports these two main use cases:
