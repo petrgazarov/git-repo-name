@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Shell wrapper for git-repo-name that handles directory changes
-# Can be used both as an executable and when sourced into a shell environment
+# This file can be either executed directly or sourced in your shell startup file (e.g. ~/.bashrc or ~/.zshrc).
+# To enable automatic PWD changes, source this file in your shell startup file.
 
-git_repo_name() {
+git-repo-name() {
     tmp_file=$(mktemp /tmp/git-repo-name-output.XXXXXX)
     
     # tee writes the full (raw) output to the temporary file,
@@ -26,7 +26,7 @@ git_repo_name() {
         
         # Only change directory if we're in the original (old) directory.
         if [ "$PWD" = "$old_path" ]; then
-            cd "$new_path" || return 1
+            builtin cd "$new_path" || return 1
         fi
     fi
     
@@ -35,9 +35,10 @@ git_repo_name() {
     return "$exit_code"
 }
 
-# Define our function as the git-repo-name command.
 if (return 0 2>/dev/null); then
-    alias git-repo-name=git_repo_name
+    # Being sourced: do nothing. The shell function is defined above.
+    :
 else
-    git_repo_name "$@"
+    # Being executed: run the function.
+    git-repo-name "$@"
 fi
