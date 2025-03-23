@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: git-repo-name.sh
-          path: shell/git-repo-name.sh
+          path: git-repo-name.sh
           if-no-files-found: error
 
   verify-version:

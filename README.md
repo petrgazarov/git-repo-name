@@ -162,7 +162,7 @@ Alternatively, you can clone this repository and build from source using Cargo:
 2. Download the shell script from the repository and make it executable:
 
    ```bash
-   curl -o /usr/local/bin/git-repo-name https://raw.githubusercontent.com/petrgazarov/git-repo-name/main/shell/git-repo-name.sh
+   curl -o /usr/local/bin/git-repo-name https://raw.githubusercontent.com/petrgazarov/git-repo-name/main/git-repo-name.sh
    chmod +x /usr/local/bin/git-repo-name
    ```
 
