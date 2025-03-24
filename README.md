@@ -159,7 +159,13 @@ Alternatively, you can clone this repository and build from source using Cargo:
    cargo install --git https://github.com/petrgazarov/git-repo-name.git
    ```
 
-2. Download the shell script from the repository and make it executable:
+2. Rename the cargo-installed binary:
+
+   ```bash
+   mv $(which git-repo-name) $(dirname $(which git-repo-name))/git-repo-name-bin
+   ```
+
+3. Download the shell script from the repository and make it executable:
 
    ```bash
    curl -o /usr/local/bin/git-repo-name https://raw.githubusercontent.com/petrgazarov/git-repo-name/main/git-repo-name.sh
@@ -167,12 +173,6 @@ Alternatively, you can clone this repository and build from source using Cargo:
    ```
 
    Replace `/usr/local/bin` with your preferred installation directory (ensure it's in your PATH).
-
-3. Rename the cargo-installed binary:
-
-   ```bash
-   mv $(which git-repo-name) $(dirname $(which git-repo-name))/git-repo-name-bin
-   ```
 
 4. Add the following line to your shell startup file (e.g., `~/.bashrc` or `~/.zshrc`):
 
