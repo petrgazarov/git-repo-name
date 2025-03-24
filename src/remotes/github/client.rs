@@ -50,7 +50,7 @@ pub fn get_repo_info(owner: &str, repo: &str) -> Result<GitHubRepo> {
             if resp.status() == StatusCode::NOT_FOUND {
                 // GitHub returns 404 for private repos when unauthorized
                 Err(Error::GitHubApi(
-                  "Repository not found. If this is a private repository, please configure a GitHub token with 'git repo-name config github-token YOUR_TOKEN'".to_string(),
+                  "Repository not found. If this is a private repository, please configure a GitHub token with 'git-repo-name config github-token YOUR_TOKEN'".to_string(),
               ))
             } else {
                 // Process successful response

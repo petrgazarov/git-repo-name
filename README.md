@@ -6,8 +6,8 @@
 
 It works bi-directionally and supports these two main use cases:
 
-- When you rename a repo on GitHub, run `git repo-name pull` to update the local git directory name.
-- When you rename a local git directory, run `git repo-name push` to rename the repo on GitHub.
+- When you rename a repo on GitHub, run `git-repo-name pull` to update the local git directory name.
+- When you rename a local git directory, run `git-repo-name push` to rename the repo on GitHub.
 
 In both cases, it makes an API call to GitHub, compares the repo name to the local directory name, and automatically renames the appropriate side.
 
@@ -16,10 +16,10 @@ In both cases, it makes an API call to GitHub, compares the repo name to the loc
 `git-repo-name` provides four main commands:
 
 ```sh
-git repo-name pull    # Fetches repo name from the remote and renames local git directory name to match it
-git repo-name push    # Renames repo name on the remote with the local git directory name
-git repo-name fetch   # Fetches repo name from the remote without making changes
-git repo-name config  # Configures settings (GitHub token and default remote)
+git-repo-name pull    # Fetches repo name from the remote and renames local git directory name to match it
+git-repo-name push    # Renames repo name on the remote with the local git directory name
+git-repo-name fetch   # Fetches repo name from the remote without making changes
+git-repo-name config  # Configures settings (GitHub token and default remote)
 ```
 
 ### pull
@@ -32,13 +32,13 @@ Examples
 
 ```bash
 # Basic usage
-git repo-name pull
+git-repo-name pull
 
 # Specify a remote [default: origin]
-git repo-name pull -r upstream
+git-repo-name pull -r upstream
 
 # Preview what would happen without making changes
-git repo-name pull -n
+git-repo-name pull -n
 ```
 
 ### push
@@ -51,13 +51,13 @@ Examples
 
 ```bash
 # Basic usage
-git repo-name push
+git-repo-name push
 
 # Specify a remote [default: origin]
-git repo-name push -r upstream
+git-repo-name push -r upstream
 
 # Preview what would happen without making changes
-git repo-name push -n
+git-repo-name push -n
 ```
 
 ### fetch
@@ -68,10 +68,10 @@ Examples
 
 ```bash
 # Basic usage
-git repo-name fetch
+git-repo-name fetch
 
 # Specify a remote [default: origin]
-git repo-name fetch -r upstream
+git-repo-name fetch -r upstream
 ```
 
 ### config
@@ -86,10 +86,10 @@ Configures settings.
 
   ```sh
   # View default remote
-  git repo-name config default-remote
+  git-repo-name config default-remote
 
   # Set default remote
-  git repo-name config default-remote upstream
+  git-repo-name config default-remote upstream
   ```
 
 - `github-token`: GitHub [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) for authenticating GitHub API requests.
@@ -107,10 +107,10 @@ Configures settings.
 
   ```sh
   # View GitHub token
-  git repo-name config github-token
+  git-repo-name config github-token
 
   # Set GitHub token
-  git repo-name config github-token ghp_your_token_here
+  git-repo-name config github-token ghp_your_token_here
   ```
 
 ## Installation
@@ -183,7 +183,3 @@ Alternatively, you can clone this repository and build from source using Cargo:
 ## Supported remotes
 
 `git-repo-name` currently supports GitHub and file (bare) remotes.
-
-## Acknowledgments
-
-Inspired by [git-open](https://github.com/paulirish/git-open) — an awesome project you should check out.
