@@ -3,7 +3,7 @@ name = "git-repo-name"
 version = "0.1.11"
 edition = "2021"
 authors = ["Petr Gazarov"]
-description = '"git-repo-name" – CLI to sync repository name between local and remote'
+description = 'CLI tool that syncs your local git directory name with the remote repository name'
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json", "blocking"] }
