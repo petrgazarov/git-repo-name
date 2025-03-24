@@ -1,6 +1,6 @@
 [package]
 name = "git-repo-name"
-version = "0.1.11"
+version = "0.1.12"
 edition = "2021"
 authors = ["Petr Gazarov"]
 description = 'CLI tool that syncs your local git directory name with the remote repository name'
