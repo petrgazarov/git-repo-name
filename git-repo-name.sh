@@ -3,7 +3,7 @@
 # This file can be either executed directly or sourced in your shell startup file (e.g. ~/.bashrc or ~/.zshrc).
 # To enable automatic PWD changes, source this file in your shell startup file.
 
-git-repo-name() {
+git_repo_name() {
     tmp_file=$(mktemp /tmp/git-repo-name-output.XXXXXX)
     
     # tee writes the full (raw) output to the temporary file,
@@ -36,9 +36,9 @@ git-repo-name() {
 }
 
 if (return 0 2>/dev/null); then
-    # Being sourced: do nothing. The shell function is defined above.
-    :
+    # Being sourced: define the alias.
+    alias git-repo-name=git_repo_name
 else
     # Being executed: run the function.
-    git-repo-name "$@"
+    git_repo_name "$@"
 fi
